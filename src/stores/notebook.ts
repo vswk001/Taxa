@@ -35,12 +35,36 @@ export const useNotebookStore = defineStore('notebook', () => {
     return note;
   }
 
-  async function updateNoteContent(id: string, content: string) {
+  async function updateNoteContent(id: string, content: string, title?: string) {
     if (!currentNote.value) return;
-    const updated = await notebookApi.updateNote({ id, content });
+    const updated = await notebookApi.updateNote({ id, content, title });
     currentNote.value = { note: updated, content };
     const idx = notes.value.findIndex(n => n.id === id);
     if (idx >= 0) notes.value[idx] = updated;
+    return updated;
+  }
+
+  async function renameNote(id: string, newTitle: string) {
+    const note = notes.value.find(n => n.id === id);
+    if (!note) return;
+    const updated = await notebookApi.updateNote({ id, title: newTitle, content: currentNote.value?.content || '' });
+    const idx = notes.value.findIndex(n => n.id === id);
+    if (idx >= 0) notes.value[idx] = updated;
+    if (currentNote.value?.note.id === id) {
+      currentNote.value.note = updated;
+    }
+    return updated;
+  }
+
+  async function moveNote(id: string, targetFolder: string, newTitle?: string) {
+    const updated = await notebookApi.moveNote({ id, target_folder: targetFolder, new_title: newTitle });
+    // Remove from current list
+    notes.value = notes.value.filter(n => n.id !== id);
+    // Update current note if it's the one being moved
+    if (currentNote.value?.note.id === id) {
+      currentNote.value.note = updated;
+    }
+    return updated;
   }
 
   async function deleteNote(id: string) {
@@ -77,5 +101,6 @@ export const useNotebookStore = defineStore('notebook', () => {
     folders, currentFolder, notes, currentNote, searchResults, searchQuery,
     currentNotes, loadFolderTree, loadNotes, openNote, createNote,
     updateNoteContent, deleteNote, search, createFolder, renameFolder, deleteFolder,
+    renameNote, moveNote,
   };
 });

@@ -11,11 +11,8 @@
       <NoteTree v-if="sidebarVisible" @openGraph="showGraph = true" @openSearch="showSearch = true" />
       <div class="center-panel">
         <TabBar />
-        <div class="editor-area">
-          <NoteEditor v-if="notebookStore.currentNote" />
-          <div v-else class="empty-state">
-            <p>选择或创建一个笔记开始</p>
-          </div>
+        <div class="editor-container">
+          <NoteEditor />
         </div>
       </div>
       <AiSidebar />
@@ -84,10 +81,12 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeyboard));
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
 }
-.editor-area {
+.editor-container {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  position: relative;
 }
 .empty-state {
   display: flex;
