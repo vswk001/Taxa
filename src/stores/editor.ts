@@ -21,5 +21,11 @@ export const useEditorStore = defineStore('editor', () => {
     }
   }
 
-  return { openTabs, activeTabId, isModified, openTab, closeTab };
+  function setActiveTab(id: string) {
+    if (openTabs.value.find(t => t.id === id)) {
+      activeTabId.value = id;
+    }
+  }
+
+  return { openTabs, activeTabId, isModified, openTab, closeTab, setActiveTab };
 });

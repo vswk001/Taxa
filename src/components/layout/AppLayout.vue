@@ -1,8 +1,14 @@
 <template>
   <div class="app-layout">
-    <MenuBar />
+    <MenuBar
+      @openSettings="showSettings = true"
+      @createNote="handleCreateNote"
+      @toggleSearch="showSearch = !showSearch"
+      @toggleGraph="showGraph = !showGraph"
+      @toggleSidebar="sidebarVisible = !sidebarVisible"
+    />
     <div class="main-content">
-      <NoteTree @openGraph="showGraph = true" @openSearch="showSearch = true" />
+      <NoteTree v-if="sidebarVisible" @openGraph="showGraph = true" @openSearch="showSearch = true" />
       <div class="center-panel">
         <TabBar />
         <div class="editor-area">
@@ -15,9 +21,9 @@
       <AiSidebar />
     </div>
     <StatusBar />
-    <SearchPanel :visible="showSearch" @close="showSearch = false" />
-    <GraphView :visible="showGraph" @close="showGraph = false" />
-    <SettingsDialog :visible="showSettings" @close="showSettings = false" />
+    <SearchPanel v-if="showSearch" :visible="showSearch" @close="showSearch = false" />
+    <GraphView v-if="showGraph" :visible="showGraph" @close="showGraph = false" />
+    <SettingsDialog v-if="showSettings" :visible="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
@@ -38,12 +44,20 @@ const notebookStore = useNotebookStore();
 const showSearch = ref(false);
 const showGraph = ref(false);
 const showSettings = ref(false);
+const sidebarVisible = ref(true);
 
 function handleKeyboard(e: KeyboardEvent) {
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.key === 'k') { e.preventDefault(); showSearch.value = !showSearch.value; }
   if (ctrl && e.key === 'g') { e.preventDefault(); showGraph.value = !showGraph.value; }
   if (ctrl && e.key === ',') { e.preventDefault(); showSettings.value = !showSettings.value; }
+  if (ctrl && e.key === 'n') { e.preventDefault(); handleCreateNote(); }
+  if (ctrl && e.key === 'b') { e.preventDefault(); sidebarVisible.value = !sidebarVisible.value; }
+}
+
+async function handleCreateNote() {
+  const folder = notebookStore.currentFolder || '未分类';
+  await notebookStore.createNote(folder, '新笔记', '');
 }
 
 onMounted(() => {

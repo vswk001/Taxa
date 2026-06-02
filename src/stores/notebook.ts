@@ -32,6 +32,7 @@ export const useNotebookStore = defineStore('notebook', () => {
     notes.value.unshift(note);
     await openNote(note.id);
     await loadFolderTree();
+    return note;
   }
 
   async function updateNoteContent(id: string, content: string) {
@@ -60,9 +61,21 @@ export const useNotebookStore = defineStore('notebook', () => {
     searchResults.value = await notebookApi.searchNotes(query);
   }
 
+  async function createFolder(parent: string, name: string) {
+    return await notebookApi.createFolder(parent, name);
+  }
+
+  async function renameFolder(path: string, newName: string) {
+    return await notebookApi.renameFolder(path, newName);
+  }
+
+  async function deleteFolder(path: string) {
+    return await notebookApi.deleteFolder(path);
+  }
+
   return {
     folders, currentFolder, notes, currentNote, searchResults, searchQuery,
     currentNotes, loadFolderTree, loadNotes, openNote, createNote,
-    updateNoteContent, deleteNote, search,
+    updateNoteContent, deleteNote, search, createFolder, renameFolder, deleteFolder,
   };
 });
