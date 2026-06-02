@@ -15,9 +15,9 @@
       <AiSidebar />
     </div>
     <StatusBar />
-    <SearchPanel v-if="showSearch" @close="showSearch = false" />
-    <GraphView v-if="showGraph" @close="showGraph = false" />
-    <SettingsDialog v-if="showSettings" @close="showSettings = false" />
+    <SearchPanel :visible="showSearch" @close="showSearch = false" />
+    <GraphView :visible="showGraph" @close="showGraph = false" />
+    <SettingsDialog :visible="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
