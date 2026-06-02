@@ -24,6 +24,14 @@ pub fn run() {
 
             let state = AppState::new(data_dir)?;
             app.manage(state);
+
+            // Load AI providers after AppState is managed
+            {
+                let state_handle = app.state::<AppState>();
+                let db = state_handle.db.lock().map_err(|e| error::AppError::Database(e.to_string()))?;
+                state_handle.ai_engine.blocking_write().load_providers(&db)?;
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -38,6 +46,14 @@ pub fn run() {
             commands::notebook::create_folder,
             commands::notebook::rename_folder,
             commands::notebook::delete_folder,
+            commands::ai::ai_process_input,
+            commands::ai::ai_apply_result,
+            commands::ai::ai_enrich_note,
+            commands::ai::ai_test_provider,
+            commands::settings::list_providers,
+            commands::settings::save_provider,
+            commands::settings::delete_provider,
+            commands::graph::get_graph_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Taxis");
