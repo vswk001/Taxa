@@ -1,0 +1,32 @@
+/* src/styles/variables.css */
+:root {
+  --sidebar-width: 260px;
+  --ai-sidebar-width: 320px;
+  --tab-height: 40px;
+  --toolbar-height: 42px;
+  --status-height: 28px;
+  --border-color: #e0e0e0;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-sidebar: #fafafa;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --accent-color: #4a90d9;
+  --accent-hover: #357abd;
+  --danger-color: #e74c3c;
+  --success-color: #27ae60;
+  --radius: 6px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+[data-theme="dark"] {
+  --border-color: #3a3a3a;
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252525;
+  --bg-sidebar: #2a2a2a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #999999;
+  --accent-color: #5ba0e9;
+  --accent-hover: #4a90d9;
+}
