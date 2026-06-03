@@ -19,7 +19,7 @@ impl AiEngine {
     pub fn load_providers(&mut self, db: &Database) -> AppResult<()> {
         let conn = db.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, provider_type, api_url, model_name, is_default, enabled FROM llm_providers"
+            "SELECT id, name, provider_type, api_url, api_key_encrypted, model_name, is_default, enabled FROM llm_providers"
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -27,16 +27,19 @@ impl AiEngine {
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, bool>(5)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
                 row.get::<_, bool>(6)?,
+                row.get::<_, bool>(7)?,
             ))
         })?;
 
         self.providers.clear();
         for row in rows {
-            let (id, name, ptype, url, model, is_default, enabled) = row?;
-            let api_key = KeyringStore::get_key(&id).unwrap_or_default();
+            let (id, name, ptype, url, db_key, model, is_default, enabled) = row?;
+            // Try keyring first, then fall back to DB stored key
+            let api_key = KeyringStore::get_key(&id)
+                .unwrap_or_else(|_| db_key.unwrap_or_default());
             self.providers.insert(id.clone(), ProviderConfig {
                 id, name, provider_type: ptype, api_url: url,
                 api_key, model_name: model, is_default, enabled,
@@ -74,22 +77,5 @@ impl AiEngine {
             .ok_or_else(|| crate::error::AppError::AiEngine("No default LLM provider configured".into()))?;
 
         AiOrganizer::enrich_note(config, title, content).await
-    }
-
-    pub fn save_provider(&self, db: &Database, config: &ProviderConfig) -> AppResult<()> {
-        KeyringStore::save_key(&config.id, &config.api_key)?;
-
-        db.conn().execute(
-            "INSERT OR REPLACE INTO llm_providers (id, name, provider_type, api_url, model_name, is_default, enabled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![config.id, config.name, config.provider_type, config.api_url, config.model_name, config.is_default, config.enabled],
-        )?;
-        Ok(())
-    }
-
-    pub fn delete_provider(&self, db: &Database, id: &str) -> AppResult<()> {
-        KeyringStore::delete_key(id)?;
-        db.conn().execute("DELETE FROM llm_providers WHERE id=?1", params![id])?;
-        Ok(())
     }
 }

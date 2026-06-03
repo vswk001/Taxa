@@ -14,6 +14,7 @@ pub struct ChatOptions {
     pub model: String,
     pub temperature: f32,
     pub max_tokens: u32,
+    pub timeout_secs: u64,
 }
 
 impl Default for ChatOptions {
@@ -22,6 +23,7 @@ impl Default for ChatOptions {
             model: String::new(),
             temperature: 0.7,
             max_tokens: 4096,
+            timeout_secs: 60,
         }
     }
 }

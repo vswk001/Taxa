@@ -3,6 +3,7 @@ use crate::ai::provider::*;
 use crate::error::{AppError, AppResult};
 use async_trait::async_trait;
 use reqwest::Client;
+use std::time::Duration;
 
 pub struct OpenAiProvider {
     client: Client,
@@ -13,8 +14,12 @@ pub struct OpenAiProvider {
 
 impl OpenAiProvider {
     pub fn new(config: &ProviderConfig) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .unwrap_or_else(|_| Client::new());
         Self {
-            client: Client::new(),
+            client,
             api_url: config.api_url.trim_end_matches('/').to_string(),
             api_key: config.api_key.clone(),
             model: config.model_name.clone(),
@@ -77,7 +82,7 @@ impl LlmProvider for OpenAiProvider {
             .header("authorization", format!("Bearer {}", self.api_key))
             .header("content-type", "application/json")
             .json(&body)
-            .send().await.map_err(|e| AppError::LlmProvider(e.to_string()))?;
+            .send().await.map_err(|e| AppError::LlmProvider(format!("Request failed: {}", e)))?;
 
         if !resp.status().is_success() {
             let status = resp.status();

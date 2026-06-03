@@ -5,7 +5,6 @@ export async function tauriCommand<T>(command: string, args?: Record<string, unk
   return invoke<T>(command, args);
 }
 
-// Notebook commands
 export const notebookApi = {
   createNote: (req: import('@/types/notebook').CreateNoteRequest) =>
     tauriCommand<import('@/types/notebook').Note>('create_note', { req }),
@@ -25,6 +24,7 @@ export const notebookApi = {
     tauriCommand<import('@/types/notebook').SearchResult[]>('search_notes', { query }),
   createFolder: (parent: string, name: string) =>
     tauriCommand<string>('create_folder', { parent, name }),
+  // Rust: rename_folder(path: String, new_name: String)
   renameFolder: (path: string, newName: string) =>
     tauriCommand<string>('rename_folder', { path, newName }),
   deleteFolder: (path: string) =>

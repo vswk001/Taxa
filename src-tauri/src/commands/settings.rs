@@ -14,21 +14,20 @@ pub async fn list_providers(state: State<'_, AppState>) -> AppResult<Vec<Provide
 
 #[tauri::command]
 pub async fn save_provider(state: State<'_, AppState>, config: ProviderConfig) -> AppResult<()> {
-    // Save API key to keyring
-    KeyringStore::save_key(&config.id, &config.api_key)?;
+    // Try to save API key to keyring (non-fatal if it fails)
+    let _ = KeyringStore::save_key(&config.id, &config.api_key);
 
-    // Save provider to database (synchronously)
+    // Save provider + API key to database
     {
         let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
         db.conn().execute(
-            "INSERT OR REPLACE INTO llm_providers (id, name, provider_type, api_url, model_name, is_default, enabled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![config.id, config.name, config.provider_type, config.api_url, config.model_name, config.is_default, config.enabled],
+            "INSERT OR REPLACE INTO llm_providers (id, name, provider_type, api_url, api_key_encrypted, model_name, is_default, enabled)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![config.id, config.name, config.provider_type, config.api_url, config.api_key, config.model_name, config.is_default, config.enabled],
         )?;
-        // db lock is released here
     }
 
-    // Reload providers into engine (async)
+    // Reload providers into engine
     let mut engine = state.ai_engine.write().await;
     let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
     engine.load_providers(&db)?;
@@ -37,17 +36,16 @@ pub async fn save_provider(state: State<'_, AppState>, config: ProviderConfig) -
 
 #[tauri::command]
 pub async fn delete_provider(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    // Delete API key from keyring
-    KeyringStore::delete_key(&id)?;
+    // Try to delete from keyring (non-fatal)
+    let _ = KeyringStore::delete_key(&id);
 
-    // Delete provider from database (synchronously)
+    // Delete from database
     {
         let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
         db.conn().execute("DELETE FROM llm_providers WHERE id=?1", params![id])?;
-        // db lock is released here
     }
 
-    // Reload providers into engine (async)
+    // Reload providers
     let mut engine = state.ai_engine.write().await;
     let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
     engine.load_providers(&db)?;

@@ -3,6 +3,7 @@ use crate::ai::provider::*;
 use crate::error::{AppError, AppResult};
 use async_trait::async_trait;
 use reqwest::Client;
+use std::time::Duration;
 
 pub struct ClaudeProvider {
     client: Client,
@@ -13,8 +14,12 @@ pub struct ClaudeProvider {
 
 impl ClaudeProvider {
     pub fn new(config: &ProviderConfig) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .unwrap_or_else(|_| Client::new());
         Self {
-            client: Client::new(),
+            client,
             api_url: config.api_url.trim_end_matches('/').to_string(),
             api_key: config.api_key.clone(),
             model: config.model_name.clone(),
@@ -27,6 +32,8 @@ struct ClaudeRequest {
     model: String,
     max_tokens: u32,
     messages: Vec<ClaudeMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
 }
@@ -70,21 +77,18 @@ impl LlmProvider for ClaudeProvider {
             model: if options.model.is_empty() { self.model.clone() } else { options.model },
             max_tokens: options.max_tokens,
             messages: claude_messages,
+            system: system_msg,
             temperature: Some(options.temperature),
         };
 
         let url = format!("{}/v1/messages", self.api_url);
-        let mut req = self.client.post(&url)
+        let resp = self.client.post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
-            .json(&body);
+            .json(&body)
+            .send().await.map_err(|e| AppError::LlmProvider(format!("Request failed: {}", e)))?;
 
-        if let Some(system) = system_msg {
-            req = req.header("anthropic-system", &system);
-        }
-
-        let resp = req.send().await.map_err(|e| AppError::LlmProvider(e.to_string()))?;
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();

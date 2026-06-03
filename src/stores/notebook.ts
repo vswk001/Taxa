@@ -19,8 +19,30 @@ export const useNotebookStore = defineStore('notebook', () => {
   }
 
   async function loadNotes(folder: string) {
+    const folderNotes = await notebookApi.listNotes(folder);
+    // Merge: add new notes, update existing, don't remove notes from other folders
+    for (const note of folderNotes) {
+      const idx = notes.value.findIndex(n => n.id === note.id);
+      if (idx >= 0) {
+        notes.value[idx] = note;
+      } else {
+        notes.value.push(note);
+      }
+    }
     currentFolder.value = folder;
-    notes.value = await notebookApi.listNotes(folder);
+  }
+
+  async function loadAllNotes() {
+    const allNotes: Note[] = [];
+    for (const folder of folders.value) {
+      try {
+        const folderNotes = await notebookApi.listNotes(folder.path);
+        allNotes.push(...folderNotes);
+      } catch (e) {
+        console.error(`Failed to load notes from ${folder.path}:`, e);
+      }
+    }
+    notes.value = allNotes;
   }
 
   async function openNote(id: string) {
@@ -45,9 +67,8 @@ export const useNotebookStore = defineStore('notebook', () => {
   }
 
   async function renameNote(id: string, newTitle: string) {
-    const note = notes.value.find(n => n.id === id);
-    if (!note) return;
-    const updated = await notebookApi.updateNote({ id, title: newTitle, content: currentNote.value?.content || '' });
+    const content = currentNote.value?.note.id === id ? currentNote.value.content : '';
+    const updated = await notebookApi.updateNote({ id, title: newTitle, content });
     const idx = notes.value.findIndex(n => n.id === id);
     if (idx >= 0) notes.value[idx] = updated;
     if (currentNote.value?.note.id === id) {
@@ -58,9 +79,8 @@ export const useNotebookStore = defineStore('notebook', () => {
 
   async function moveNote(id: string, targetFolder: string, newTitle?: string) {
     const updated = await notebookApi.moveNote({ id, target_folder: targetFolder, new_title: newTitle });
-    // Remove from current list
-    notes.value = notes.value.filter(n => n.id !== id);
-    // Update current note if it's the one being moved
+    const idx = notes.value.findIndex(n => n.id === id);
+    if (idx >= 0) notes.value[idx] = updated;
     if (currentNote.value?.note.id === id) {
       currentNote.value.note = updated;
     }
@@ -99,7 +119,7 @@ export const useNotebookStore = defineStore('notebook', () => {
 
   return {
     folders, currentFolder, notes, currentNote, searchResults, searchQuery,
-    currentNotes, loadFolderTree, loadNotes, openNote, createNote,
+    currentNotes, loadFolderTree, loadNotes, loadAllNotes, openNote, createNote,
     updateNoteContent, deleteNote, search, createFolder, renameFolder, deleteFolder,
     renameNote, moveNote,
   };
