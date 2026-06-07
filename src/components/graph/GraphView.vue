@@ -1,9 +1,5 @@
 <template>
-  <div class="graph-view" v-if="visible">
-    <div class="graph-header">
-      <span>笔记图谱</span>
-      <button @click="emit('close')">×</button>
-    </div>
+  <div class="graph-view">
     <canvas ref="canvasRef" class="graph-canvas" @mousedown="startDrag" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag"></canvas>
   </div>
 </template>
@@ -12,8 +8,6 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 
-const emit = defineEmits<{ close: [] }>();
-defineProps<{ visible: boolean }>();
 const canvasRef = ref<HTMLCanvasElement>();
 
 interface GraphNode { id: string; title: string; folder: string; }
@@ -31,6 +25,7 @@ let nodes: NodeWithPosition[] = [];
 let edges: GraphEdge[] = [];
 let dragging: number | null = null;
 let animationId: number | null = null;
+let animating = false;
 
 async function loadGraphData() {
   try {
@@ -38,11 +33,8 @@ async function loadGraphData() {
     const canvas = canvasRef.value;
     if (!canvas) return;
 
-    // Set canvas size
-    const rect = canvas.parentElement?.querySelector('.graph-header')?.getBoundingClientRect();
-    const headerHeight = rect?.height || 40;
     canvas.width = canvas.parentElement!.clientWidth;
-    canvas.height = canvas.parentElement!.clientHeight - headerHeight;
+    canvas.height = canvas.parentElement!.clientHeight;
 
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
@@ -66,10 +58,12 @@ async function loadGraphData() {
 
 function startAnimation() {
   if (animationId) cancelAnimationFrame(animationId);
+  animating = true;
   draw();
 }
 
 function stopAnimation() {
+  animating = false;
   if (animationId) {
     cancelAnimationFrame(animationId);
     animationId = null;
@@ -77,6 +71,7 @@ function stopAnimation() {
 }
 
 function draw() {
+  if (!animating) return;
   const canvas = canvasRef.value;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -137,22 +132,29 @@ function stopDrag() {
 
 onMounted(() => {
   loadGraphData();
-  // Handle window resize
   window.addEventListener('resize', handleResize);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onBeforeUnmount(() => {
   stopAnimation();
   window.removeEventListener('resize', handleResize);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
+
+function handleVisibilityChange() {
+  if (document.hidden) {
+    stopAnimation();
+  } else if (nodes.length > 0) {
+    startAnimation();
+  }
+}
 
 function handleResize() {
   const canvas = canvasRef.value;
   if (canvas && canvas.parentElement) {
-    const rect = canvas.parentElement?.querySelector('.graph-header')?.getBoundingClientRect();
-    const headerHeight = rect?.height || 40;
     canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = canvas.parentElement.clientHeight - headerHeight;
+    canvas.height = canvas.parentElement.clientHeight;
   }
 }
 
@@ -166,46 +168,11 @@ watch(() => canvasRef.value, () => {
 
 <style scoped>
 .graph-view {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-primary);
-  z-index: 50;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.graph-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
-}
-
-.graph-header span {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.graph-header button {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--text-primary);
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.graph-header button:hover {
-  background: var(--hover-bg);
-  border-radius: 4px;
+  background: var(--bg-primary);
 }
 
 .graph-canvas {

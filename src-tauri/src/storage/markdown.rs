@@ -15,9 +15,16 @@ impl MarkdownStorage {
     pub fn create_note(&self, folder: &str, filename: &str, content: &str) -> AppResult<PathBuf> {
         let dir = self.base_dir.join(folder);
         fs::create_dir_all(&dir)?;
-        let path = dir.join(format!("{}.md", sanitize_filename(filename)));
+        let sanitized = sanitize_filename(filename);
+        let mut path = dir.join(format!("{}.md", sanitized));
+        // Auto-rename if file already exists
         if path.exists() {
-            return Err(AppError::FileIo(format!("Note already exists: {}", path.display())));
+            let mut i = 1;
+            loop {
+                path = dir.join(format!("{}-{}.md", sanitized, i));
+                if !path.exists() { break; }
+                i += 1;
+            }
         }
         fs::write(&path, content)?;
         Ok(path)

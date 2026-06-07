@@ -1,5 +1,5 @@
 // src-tauri/src/ai/organizer.rs
-use crate::ai::provider::{ChatOptions, ProviderConfig, create_provider};
+use crate::ai::provider::{ChatOptions, ProviderConfig, StreamCallback, create_provider};
 use crate::ai::prompt::PromptTemplates;
 use crate::error::AppResult;
 use crate::notebook::model::Note;
@@ -17,6 +17,8 @@ pub struct OrganizeResult {
     pub content: String,
     pub target_note_id: Option<String>,
     pub complexity: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +27,39 @@ pub struct EnrichResult {
     pub content: String,
     pub summary: String,
     pub tags: Vec<String>,
+}
+
+/// Extract JSON from LLM response, handling markdown code blocks and extra text
+fn extract_json(text: &str) -> &str {
+    let trimmed = text.trim();
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        return trimmed;
+    }
+    // Try ```json ... ```
+    if let Some(start) = trimmed.find("```json") {
+        let json_start = start + 7;
+        if let Some(end) = trimmed[json_start..].find("```") {
+            return trimmed[json_start..json_start + end].trim();
+        }
+    }
+    // Try ``` ... ```
+    if let Some(start) = trimmed.find("```") {
+        let after = &trimmed[start + 3..];
+        let json_start = after.find('\n').unwrap_or(0);
+        let after = &after[json_start..];
+        if let Some(end) = after.find("```") {
+            return after[..end].trim();
+        }
+    }
+    // Find { ... } in text
+    if let Some(start) = trimmed.find('{') {
+        if let Some(end) = trimmed.rfind('}') {
+            if end > start {
+                return &trimmed[start..=end];
+            }
+        }
+    }
+    trimmed
 }
 
 pub struct AiOrganizer;
@@ -36,14 +71,35 @@ impl AiOrganizer {
         folder_structure: &str,
         related_notes: &str,
     ) -> AppResult<OrganizeResult> {
+        Self::process_user_input_stream(config, content, folder_structure, related_notes, None).await
+    }
+
+    pub async fn process_user_input_stream(
+        config: &ProviderConfig,
+        content: &str,
+        folder_structure: &str,
+        related_notes: &str,
+        on_event: Option<StreamCallback>,
+    ) -> AppResult<OrganizeResult> {
+        eprintln!("[AI] process_user_input: provider={}, model={}", config.name, config.model_name);
         let provider = create_provider(config)?;
         let messages = PromptTemplates::categorize(content, folder_structure, related_notes);
-        let response = provider.chat(messages, ChatOptions::default()).await?;
+        eprintln!("[AI] Sending chat request with {} messages", messages.len());
 
-        let result: OrganizeResult = serde_json::from_str(
-            response.content.trim().trim_start_matches("```json").trim_end_matches("```").trim()
-        ).map_err(|e| crate::error::AppError::AiEngine(format!("Failed to parse AI response: {} - {}", e, response.content)))?;
+        let response = match on_event {
+            Some(cb) => provider.chat_stream(messages, ChatOptions::default(), cb).await?,
+            None => provider.chat(messages, ChatOptions::default()).await?,
+        };
+        eprintln!("[AI] Response received, content length: {}", response.content.len());
 
+        let json_str = extract_json(&response.content);
+        eprintln!("[AI] Extracted JSON: {} bytes", json_str.len());
+        let mut result: OrganizeResult = serde_json::from_str(json_str).map_err(|e| {
+            crate::error::AppError::AiEngine(format!(
+                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
+            ))
+        })?;
+        result.reasoning = response.reasoning;
         Ok(result)
     }
 
@@ -56,11 +112,12 @@ impl AiOrganizer {
         let messages = PromptTemplates::enrich(title, content);
         let response = provider.chat(messages, ChatOptions::default()).await?;
 
-        let result: EnrichResult = serde_json::from_str(
-            response.content.trim().trim_start_matches("```json").trim_end_matches("```").trim()
-        ).map_err(|e| crate::error::AppError::AiEngine(format!("Failed to parse enrich response: {}", e)))?;
-
-        Ok(result)
+        let json_str = extract_json(&response.content);
+        serde_json::from_str(json_str).map_err(|e| {
+            crate::error::AppError::AiEngine(format!(
+                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
+            ))
+        })
     }
 
     pub fn apply_create(

@@ -9,6 +9,15 @@
         <div v-if="activeMenu === menu.label" class="dropdown-menu" @mouseleave="closeMenu">
           <template v-for="item in menu.items" :key="item.label || 'separator'">
             <div v-if="item.separator" class="menu-separator"></div>
+            <div v-else-if="item.submenu" class="dropdown-item has-submenu" @mouseenter="openSubmenu = item.label ?? null" @mouseleave="openSubmenu = null">
+              <span>{{ item.label }}</span>
+              <span class="submenu-arrow">▸</span>
+              <div v-if="openSubmenu === item.label" class="submenu">
+                <button v-for="sub in item.submenu" :key="sub.label" class="dropdown-item" @click="handleAction(sub.action)">
+                  {{ sub.label }}
+                </button>
+              </div>
+            </div>
             <button v-else class="dropdown-item" @click="handleAction(item.action)">
               {{ item.label }}
               <span v-if="item.shortcut" class="shortcut">{{ item.shortcut }}</span>
@@ -25,19 +34,24 @@ import { ref } from 'vue';
 
 const emit = defineEmits<{
   openSettings: [];
-  createNote: [];
   toggleSearch: [];
   toggleGraph: [];
   toggleSidebar: [];
+  importFile: [];
+  importFolder: [];
+  exportFile: [];
+  exportFolder: [];
 }>();
 
 const activeMenu = ref<string | null>(null);
+const openSubmenu = ref<string | null>(null);
 
 interface MenuItem {
   label?: string;
   action?: string;
   shortcut?: string;
   separator?: boolean;
+  submenu?: { label: string; action: string }[];
 }
 
 interface Menu {
@@ -49,8 +63,18 @@ const menus: Menu[] = [
   {
     label: '文件',
     items: [
-      { label: '新笔记', action: 'createNote', shortcut: 'Ctrl+N' },
-      { label: '新文件夹', action: 'newFolder' },
+      {
+        label: '打开', submenu: [
+          { label: '打开文件...', action: 'importFile' },
+          { label: '打开目录...', action: 'importFolder' },
+        ]
+      },
+      {
+        label: '导出', submenu: [
+          { label: '导出为文件...', action: 'exportFile' },
+          { label: '导出为目录...', action: 'exportFolder' },
+        ]
+      },
       { separator: true },
       { label: '设置', action: 'openSettings', shortcut: 'Ctrl+,' },
     ]
@@ -94,17 +118,20 @@ function toggleMenu(label: string) {
     activeMenu.value = null;
   } else {
     activeMenu.value = label;
+    openSubmenu.value = null;
   }
 }
 
 function handleMouseEnter(label: string) {
   if (activeMenu.value) {
     activeMenu.value = label;
+    openSubmenu.value = null;
   }
 }
 
 function closeMenu() {
   activeMenu.value = null;
+  openSubmenu.value = null;
 }
 
 function handleAction(action?: string) {
@@ -115,9 +142,6 @@ function handleAction(action?: string) {
     case 'openSettings':
       emit('openSettings');
       break;
-    case 'createNote':
-      emit('createNote');
-      break;
     case 'toggleSearch':
       emit('toggleSearch');
       break;
@@ -127,12 +151,19 @@ function handleAction(action?: string) {
     case 'toggleSidebar':
       emit('toggleSidebar');
       break;
-    case 'newFolder':
-      // TODO: Implement new folder dialog
-      console.log('New folder');
+    case 'importFile':
+      emit('importFile');
+      break;
+    case 'importFolder':
+      emit('importFolder');
+      break;
+    case 'exportFile':
+      emit('exportFile');
+      break;
+    case 'exportFolder':
+      emit('exportFolder');
       break;
     case 'toggleAi':
-      // TODO: Implement AI sidebar toggle
       console.log('Toggle AI');
       break;
     case 'about':
@@ -143,7 +174,6 @@ function handleAction(action?: string) {
     case 'cut':
     case 'copy':
     case 'paste':
-      // Browser defaults will handle these for textarea
       document.execCommand(action);
       break;
   }
@@ -230,6 +260,28 @@ function handleAction(action?: string) {
 .dropdown-item:hover {
   background: var(--accent-color);
   color: white;
+}
+
+.has-submenu {
+  position: relative;
+}
+
+.submenu-arrow {
+  font-size: 10px;
+  margin-left: auto;
+  padding-left: 16px;
+}
+
+.submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  min-width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
 }
 
 .shortcut {

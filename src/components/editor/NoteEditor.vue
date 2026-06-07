@@ -1,34 +1,55 @@
 <template>
-  <div class="note-editor">
+  <div class="note-editor" @keydown="handleKeyDown">
     <div v-if="notebookStore.currentNote" class="note-header">
-      <input
-        v-model="localTitle"
-        class="title-input"
-        placeholder="笔记标题..."
-        @blur="saveTitle"
-        @keyup.enter="saveTitle"
-      />
-      <span class="note-meta">{{ wordCount }} 字</span>
+      <div class="header-row">
+        <input
+          v-model="localTitle"
+          class="title-input"
+          placeholder="笔记标题..."
+          @blur="saveTitle"
+          @keyup.enter="saveTitle"
+        />
+        <span class="note-meta">{{ wordCount }} 字</span>
+      </div>
+      <div class="tag-row">
+        <span
+          v-for="tag in localTags"
+          :key="tag"
+          class="tag-badge"
+        >
+          {{ tag }}
+          <button class="tag-remove" @click="removeTag(tag)">×</button>
+        </span>
+        <div v-if="tagInputVisible" class="tag-input-wrap">
+          <input
+            ref="tagInputRef"
+            v-model="newTag"
+            class="tag-input"
+            placeholder="标签名"
+            @keydown.enter.prevent="addTag"
+            @keydown.escape="tagInputVisible = false"
+            @blur="addTag"
+          />
+        </div>
+        <button v-else class="tag-add" @click="showTagInput">+</button>
+      </div>
     </div>
     <div v-else class="note-header">
       <span class="no-note-message">选择或创建一个笔记开始编辑</span>
     </div>
 
-    <EditorToolbar @action="handleToolbarAction" />
+    <EditorSearch
+      :visible="searchVisible"
+      :container="editorContainer"
+      @close="searchVisible = false"
+    />
 
-    <div v-if="notebookStore.currentNote" class="editor-container">
-      <textarea
-        ref="textareaRef"
-        v-model="localContent"
-        class="note-textarea"
-        placeholder="开始写作..."
-        @input="handleContentChange"
-        @keydown="handleKeyDown"
-      />
+    <div v-if="notebookStore.currentNote" ref="editorContainer" class="editor-body">
+      <MilkdownEditor v-model="localContent" />
     </div>
     <div v-else class="editor-placeholder">
       <div class="placeholder-content">
-        <p>📝 暂无选中的笔记</p>
+        <p>暂无选中的笔记</p>
         <p class="hint">从左侧选择笔记，或点击 "+" 创建新笔记</p>
       </div>
     </div>
@@ -36,67 +57,91 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, watch, computed, onBeforeUnmount, nextTick } from 'vue';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
-import EditorToolbar from './EditorToolbar.vue';
+import MilkdownEditor from './MilkdownEditor.vue';
+import EditorSearch from './EditorSearch.vue';
 
 const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
-const textareaRef = ref<HTMLTextAreaElement>();
 const localTitle = ref('');
 const localContent = ref('');
+const localTags = ref<string[]>([]);
+const tagInputVisible = ref(false);
+const newTag = ref('');
+const tagInputRef = ref<HTMLInputElement | null>(null);
+const searchVisible = ref(false);
+const editorContainer = ref<HTMLElement | null>(null);
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveSeq = 0;
+let isLoadingNote = false;
 
 const wordCount = computed(() => {
   if (!localContent.value) return 0;
-  // Simple word count for Chinese and English
   const text = localContent.value.trim();
   if (!text) return 0;
-  // Count Chinese characters and English words
   const chineseChars = text.match(/[\u4e00-\u9fa5]/g)?.length || 0;
   const englishWords = text.replace(/[\u4e00-\u9fa5]/g, ' ').match(/[a-zA-Z]+/g)?.length || 0;
   return chineseChars + englishWords;
 });
 
-// Watch for note changes
 watch(() => notebookStore.currentNote, (newNote) => {
   if (newNote) {
+    isLoadingNote = true;
     localTitle.value = newNote.note.title;
     localContent.value = newNote.content;
-    // Add to open tabs
+    localTags.value = [...newNote.note.tags];
     editorStore.openTab(newNote.note.id, newNote.note.title);
+    // Let the content prop propagate to Milkdown, then clear the loading flag
+    setTimeout(() => { isLoadingNote = false; }, 0);
   } else {
+    isLoadingNote = false;
     localTitle.value = '';
     localContent.value = '';
+    localTags.value = [];
   }
 }, { immediate: true });
 
-// Watch for active tab changes
 watch(() => editorStore.activeTabId, async (newTabId) => {
   if (newTabId && notebookStore.currentNote?.note.id !== newTabId) {
-    // Save current note first
-    if (localContent.value && notebookStore.currentNote) {
-      await saveContent();
-    }
-    // Load the new note
+    await flushSave();
     await notebookStore.openNote(newTabId);
   }
 });
 
+watch(localContent, () => {
+  if (isLoadingNote) return;
+  handleContentChange();
+});
+
 function handleContentChange() {
-  // Auto-save after 1 second debounce
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveContent();
-  }, 1000);
+  const seq = ++saveSeq;
+  const p = new Promise<void>((resolve) => {
+    saveTimer = setTimeout(async () => {
+      if (seq === saveSeq) {
+        await saveContent();
+      }
+      resolve();
+    }, 1000);
+  });
+  editorStore.setSavePromise(p);
+}
+
+async function flushSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await saveContent();
+  await editorStore.waitForSave();
 }
 
 async function saveContent() {
   if (notebookStore.currentNote && localContent.value !== undefined) {
     try {
       await notebookStore.updateNoteContent(notebookStore.currentNote.note.id, localContent.value);
-      console.log('Content saved successfully');
     } catch (error) {
       console.error('Failed to save content:', error);
     }
@@ -104,142 +149,60 @@ async function saveContent() {
 }
 
 async function saveTitle() {
-  if (notebookStore.currentNote && localTitle.value !== notebookStore.currentNote.note.title) {
+  if (notebookStore.currentNote && localTitle.value.trim() && localTitle.value !== notebookStore.currentNote.note.title) {
     try {
-      // Update title via updateNote API (need to add this to the store)
       const noteId = notebookStore.currentNote.note.id;
-      const newContent = localContent.value;
-
-      // For now, we'll update the entire note with the new title
-      await notebookStore.updateNoteContent(noteId, newContent);
-
-      // Update the local note object
-      if (notebookStore.currentNote) {
-        notebookStore.currentNote.note.title = localTitle.value;
-      }
-
-      // Update tab title
-      const tab = editorStore.openTabs.find(t => t.id === noteId);
-      if (tab) {
-        tab.title = localTitle.value;
-      }
-
-      console.log('Title saved successfully');
+      const newTitle = localTitle.value.trim();
+      await notebookStore.updateNoteContent(noteId, localContent.value, newTitle);
+      editorStore.updateTabTitle(noteId, newTitle);
     } catch (error) {
       console.error('Failed to save title:', error);
     }
   }
 }
 
-function handleToolbarAction(action: string) {
-  if (!textareaRef.value) return;
+function showTagInput() {
+  tagInputVisible.value = true;
+  newTag.value = '';
+  nextTick(() => tagInputRef.value?.focus());
+}
 
-  const textarea = textareaRef.value;
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  const selected = text.substring(start, end);
+function addTag() {
+  const t = newTag.value.trim();
+  tagInputVisible.value = false;
+  if (!t || localTags.value.includes(t)) { newTag.value = ''; return; }
+  localTags.value.push(t);
+  newTag.value = '';
+  saveTags();
+}
 
-  let replacement = selected;
-  let cursorOffset = 0;
-  let selectReplacement = false;
+function removeTag(tag: string) {
+  localTags.value = localTags.value.filter(t => t !== tag);
+  saveTags();
+}
 
-  switch (action) {
-    case 'bold':
-      replacement = `**${selected || '粗体文本'}**`;
-      cursorOffset = selected ? 0 : -2;
-      break;
-    case 'italic':
-      replacement = `*${selected || '斜体文本'}*`;
-      cursorOffset = selected ? 0 : -1;
-      break;
-    case 'heading':
-      replacement = `## ${selected || '标题'}`;
-      cursorOffset = -2;
-      break;
-    case 'list':
-      replacement = `- ${selected || '列表项'}`;
-      break;
-    case 'quote':
-      replacement = `> ${selected || '引用内容'}`;
-      break;
-    case 'code':
-      replacement = `\`\`\`\n${selected || '代码'}\n\`\`\``;
-      cursorOffset = -4;
-      selectReplacement = true;
-      break;
-    case 'link':
-      replacement = `[${selected || '链接文本'}](url)`;
-      cursorOffset = -4;
-      selectReplacement = true;
-      break;
-    case 'image':
-      replacement = `![${selected || '图片描述'}](image-url)`;
-      cursorOffset = -10;
-      selectReplacement = true;
-      break;
-    default:
-      console.log('Unknown toolbar action:', action);
-      return;
-  }
-
-  const newText = text.substring(0, start) + replacement + text.substring(end);
-  localContent.value = newText;
-
-  // Update cursor position
-  const newPosition = start + replacement.length + cursorOffset;
-
-  // Use nextTick to ensure the DOM is updated
-  setTimeout(() => {
-    if (textareaRef.value) {
-      textareaRef.value.focus();
-      if (selectReplacement) {
-        // Select the URL part for replacement
-        if (action === 'link') {
-          textareaRef.value.selectionStart = newPosition;
-          textareaRef.value.selectionEnd = newPosition + 3;
-        } else if (action === 'code') {
-          // Select the code content
-          textareaRef.value.selectionStart = start + 4;
-          textareaRef.value.selectionEnd = start + replacement.length - 4;
-        }
-      } else {
-        textareaRef.value.selectionStart = textareaRef.value.selectionEnd = newPosition;
-      }
+async function saveTags() {
+  if (notebookStore.currentNote) {
+    try {
+      await notebookStore.updateNoteTags(notebookStore.currentNote.note.id, [...localTags.value]);
+    } catch (error) {
+      console.error('Failed to save tags:', error);
     }
-  }, 0);
+  }
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-  // Handle keyboard shortcuts
-  if (event.ctrlKey || event.metaKey) {
-    switch (event.key.toLowerCase()) {
-      case 's':
-        event.preventDefault();
-        saveContent();
-        break;
-      case 'b':
-        event.preventDefault();
-        handleToolbarAction('bold');
-        break;
-      case 'i':
-        event.preventDefault();
-        handleToolbarAction('italic');
-        break;
-    }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    flushSave();
+  } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+    event.preventDefault();
+    searchVisible.value = true;
   }
 }
 
-onMounted(() => {
-  // Focus textarea when note is loaded
-  if (textareaRef.value && notebookStore.currentNote) {
-    textareaRef.value.focus();
-  }
-});
-
 onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer);
-  // Save any unsaved changes
   if (notebookStore.currentNote && localContent.value) {
     saveContent();
   }
@@ -255,11 +218,14 @@ onBeforeUnmount(() => {
 }
 
 .note-header {
+  padding: 12px 24px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px 8px;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .title-input {
@@ -277,6 +243,81 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 12px;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.tag-remove:hover {
+  background: var(--danger-color);
+  color: white;
+}
+
+.tag-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tag-add:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.tag-input-wrap {
+  display: inline-flex;
+}
+
+.tag-input {
+  width: 80px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid var(--accent-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
 .no-note-message {
   font-size: 14px;
   color: var(--text-secondary);
@@ -290,29 +331,11 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.editor-container {
+.editor-body {
   flex: 1;
   overflow: hidden;
-  position: relative;
-}
-
-.note-textarea {
-  width: 100%;
-  height: 100%;
-  padding: 24px 32px;
-  font-size: 15px;
-  line-height: 1.7;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  border: none;
-  outline: none;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  resize: none;
-  overflow-y: auto;
-}
-
-.note-textarea::placeholder {
-  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-placeholder {

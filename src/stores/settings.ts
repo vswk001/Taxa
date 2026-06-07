@@ -12,17 +12,22 @@ export const useSettingsStore = defineStore('settings', () => {
     providers.value = await invoke<LlmProvider[]>('list_providers');
   }
 
-  async function saveProvider(form: LlmProviderForm) {
-    const id = form.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
-    // Rust save_provider expects param named "config"
+  async function saveProvider(form: LlmProviderForm & { id?: string }) {
+    const id = form.id || form.name.toLowerCase().replace(/[\s+]+/g, '-') + '-' + Date.now();
+    const apiUrl = form.api_url || getDefaultUrl(form.provider_type);
+    const modelName = form.model_name || getDefaultModel(form.provider_type);
+
+    // When editing and api_key is empty, keep the existing key
+    const apiKey = form.api_key || (form.id ? '' : '');
+
     await invoke('save_provider', {
       config: {
         id,
         name: form.name,
         provider_type: form.provider_type,
-        api_url: form.api_url || getDefaultUrl(form.provider_type),
-        api_key: form.api_key,
-        model_name: form.model_name || getDefaultModel(form.provider_type),
+        api_url: apiUrl,
+        api_key: apiKey,
+        model_name: modelName,
         is_default: form.is_default,
         enabled: true,
       },
@@ -48,7 +53,11 @@ export const useSettingsStore = defineStore('settings', () => {
     switch (type) {
       case 'claude': return 'https://api.anthropic.com';
       case 'openai': return 'https://api.openai.com';
-      default: return 'https://api.example.com';
+      case 'glm': return 'https://open.bigmodel.cn/api/paas/v4';
+      case 'deepseek': return 'https://api.deepseek.com';
+      case 'minimax': return 'https://api.minimax.chat/v1';
+      case 'kimi': return 'https://api.moonshot.cn/v1';
+      default: return 'https://api.example.com/v1';
     }
   }
 
@@ -56,7 +65,11 @@ export const useSettingsStore = defineStore('settings', () => {
     switch (type) {
       case 'claude': return 'claude-sonnet-4-6';
       case 'openai': return 'gpt-4o';
-      default: return '';
+      case 'glm': return 'glm-4';
+      case 'deepseek': return 'deepseek-chat';
+      case 'minimax': return 'MiniMax-Text-01';
+      case 'kimi': return 'moonshot-v1-8k';
+      default: return 'model-name';
     }
   }
 

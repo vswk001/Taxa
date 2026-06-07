@@ -26,4 +26,5 @@ export interface ChatMessage {
   timestamp: string;
   suggestions?: AiSuggestion[];
   status?: 'pending' | 'done' | 'error';
+  reasoning?: string;
 }

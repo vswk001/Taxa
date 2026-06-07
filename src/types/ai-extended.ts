@@ -7,4 +7,5 @@ export interface OrganizeResult {
   content: string;
   target_note_id: string | null;
   complexity: string;
+  reasoning?: string;
 }

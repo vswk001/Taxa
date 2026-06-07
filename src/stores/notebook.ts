@@ -11,8 +11,18 @@ export const useNotebookStore = defineStore('notebook', () => {
   const currentNote = ref<NoteWithContent | null>(null);
   const searchResults = ref<SearchResult[]>([]);
   const searchQuery = ref('');
+  const viewMode = ref<'editor' | 'folder'>('editor');
+  const selectedFolderForList = ref('');
 
   const currentNotes = computed(() => notes.value);
+
+  const folderNotes = computed(() => {
+    const folder = selectedFolderForList.value;
+    if (!folder) return [];
+    return notes.value
+      .filter(n => n.folder === folder || n.folder.startsWith(folder + '/'))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  });
 
   async function loadFolderTree() {
     folders.value = await notebookApi.getFolderTree();
@@ -34,7 +44,8 @@ export const useNotebookStore = defineStore('notebook', () => {
 
   async function loadAllNotes() {
     const allNotes: Note[] = [];
-    for (const folder of folders.value) {
+    const allFolders = flattenFolders(folders.value);
+    for (const folder of allFolders) {
       try {
         const folderNotes = await notebookApi.listNotes(folder.path);
         allNotes.push(...folderNotes);
@@ -43,6 +54,15 @@ export const useNotebookStore = defineStore('notebook', () => {
       }
     }
     notes.value = allNotes;
+  }
+
+  function flattenFolders(list: Folder[]): Folder[] {
+    const result: Folder[] = [];
+    for (const f of list) {
+      result.push(f);
+      if (f.children.length) result.push(...flattenFolders(f.children));
+    }
+    return result;
   }
 
   async function openNote(id: string) {
@@ -63,6 +83,17 @@ export const useNotebookStore = defineStore('notebook', () => {
     currentNote.value = { note: updated, content };
     const idx = notes.value.findIndex(n => n.id === id);
     if (idx >= 0) notes.value[idx] = updated;
+    return updated;
+  }
+
+  async function updateNoteTags(id: string, tags: string[]) {
+    const content = currentNote.value?.note.id === id ? currentNote.value.content : '';
+    const updated = await notebookApi.updateNote({ id, content, tags });
+    const idx = notes.value.findIndex(n => n.id === id);
+    if (idx >= 0) notes.value[idx] = updated;
+    if (currentNote.value?.note.id === id) {
+      currentNote.value = { note: updated, content };
+    }
     return updated;
   }
 
@@ -96,13 +127,13 @@ export const useNotebookStore = defineStore('notebook', () => {
     await loadFolderTree();
   }
 
-  async function search(query: string) {
+  async function search(query: string, scope?: string) {
     searchQuery.value = query;
     if (!query.trim()) {
       searchResults.value = [];
       return;
     }
-    searchResults.value = await notebookApi.searchNotes(query);
+    searchResults.value = await notebookApi.searchNotes(query, scope);
   }
 
   async function createFolder(parent: string, name: string) {
@@ -119,8 +150,9 @@ export const useNotebookStore = defineStore('notebook', () => {
 
   return {
     folders, currentFolder, notes, currentNote, searchResults, searchQuery,
+    viewMode, selectedFolderForList, folderNotes,
     currentNotes, loadFolderTree, loadNotes, loadAllNotes, openNote, createNote,
-    updateNoteContent, deleteNote, search, createFolder, renameFolder, deleteFolder,
+    updateNoteContent, updateNoteTags, deleteNote, search, createFolder, renameFolder, deleteFolder,
     renameNote, moveNote,
   };
 });

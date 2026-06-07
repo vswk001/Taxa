@@ -23,6 +23,8 @@
         :selected-path="selectedPath"
         :selected-note-id="selectedNoteId"
         :note-map="noteMap"
+        :expand-version="expandVersion"
+        :expand-target="expandTarget"
         @select="emit('select', $event)"
         @select-note="emit('select-note', $event)"
         @contextmenu-folder="(e: MouseEvent, f: Folder) => emit('contextmenu-folder', e, f)"
@@ -45,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { Folder, Note } from '@/types/notebook';
 
 const props = defineProps<{
@@ -53,6 +55,8 @@ const props = defineProps<{
   selectedPath: string;
   selectedNoteId: string | null;
   noteMap: Map<string, Note[]>;
+  expandVersion: number;
+  expandTarget: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -73,6 +77,10 @@ const isSelected = computed(() => props.selectedPath === props.folder.path);
 function toggleExpanded() {
   expanded.value = !expanded.value;
 }
+
+watch(() => props.expandVersion, () => {
+  expanded.value = props.expandTarget;
+});
 
 function handleClick() {
   expanded.value = !expanded.value;

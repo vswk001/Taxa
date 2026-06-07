@@ -68,12 +68,23 @@ impl NotebookService {
         let mut note = Self::query_note_by_id(db, &req.id)?;
         let now = Utc::now().to_rfc3339();
 
-        if let Some(title) = req.title {
-            note.title = title;
+        // If title changed, rename the file
+        if let Some(title) = &req.title {
+            if *title != note.title {
+                let new_path = md.move_note(&note.path, &note.folder, title)?;
+                note.path = new_path;
+                note.title = title.clone();
+            }
         }
+
         if let Some(content) = &req.content {
             md.update_note(&note.path, content)?;
-            note.word_count = content.split_whitespace().count() as i64;
+            // Count Chinese characters + English words
+            let chinese = content.matches(|c: char| c >= '\u{4e00}' && c <= '\u{9fa5}').count() as i64;
+            let english = content.split_whitespace()
+                .filter(|w| w.chars().next().map(|c| c.is_ascii_alphabetic()).unwrap_or(false))
+                .count() as i64;
+            note.word_count = chinese + english;
         }
         if let Some(tags) = req.tags {
             note.tags = tags;
@@ -82,8 +93,8 @@ impl NotebookService {
 
         let tags_json = serde_json::to_string(&note.tags)?;
         db.conn().execute(
-            "UPDATE notes SET title=?1, tags=?2, updated_at=?3, word_count=?4 WHERE id=?5",
-            params![note.title, tags_json, now, note.word_count, note.id],
+            "UPDATE notes SET title=?1, path=?2, tags=?3, updated_at=?4, word_count=?5 WHERE id=?6",
+            params![note.title, note.path, tags_json, now, note.word_count, note.id],
         )?;
 
         if let Some(content) = req.content {
@@ -128,14 +139,35 @@ impl NotebookService {
         })
     }
 
-    pub fn list_notes(db: &Database, folder: &str) -> AppResult<Vec<Note>> {
+    pub fn list_notes(db: &Database, md: &MarkdownStorage, folder: &str) -> AppResult<Vec<Note>> {
         let mut stmt = db.conn().prepare(
             "SELECT id, path, title, folder, tags, created_at, updated_at, word_count, summary, ai_categorized
              FROM notes WHERE folder = ?1 ORDER BY updated_at DESC"
         )?;
-        let notes = stmt.query_map(params![folder], |row| {
+        let mut notes = stmt.query_map(params![folder], |row| {
             Ok(row_to_note(row))
         })?.collect::<Result<Vec<_>, _>>()?;
+
+        // Auto-fill summary from file content when missing
+        for note in &mut notes {
+            if note.summary.is_none() {
+                if let Ok(content) = md.read_note(&note.path) {
+                    let preview: String = content
+                        .lines()
+                        .filter(|l| !l.trim().is_empty() && !l.starts_with('#') && !l.starts_with("---"))
+                        .take(3)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .chars()
+                        .take(120)
+                        .collect();
+                    if !preview.is_empty() {
+                        note.summary = Some(preview);
+                    }
+                }
+            }
+        }
+
         Ok(notes)
     }
 
@@ -143,22 +175,77 @@ impl NotebookService {
         Self::build_folder_tree(md, "")
     }
 
-    pub fn search_notes(db: &Database, query: &str) -> AppResult<Vec<SearchResult>> {
-        let mut stmt = db.conn().prepare(
-            "SELECT n.id, n.title, n.path, snippet(notes_fts, 1, '<mark>', '</mark>', '...', 32) as snippet, rank
-             FROM notes_fts f JOIN notes n ON n.rowid = f.rowid
-             WHERE notes_fts MATCH ?1 ORDER BY rank LIMIT 50"
-        )?;
-        let results = stmt.query_map(params![query], |row| {
-            Ok(SearchResult {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                path: row.get(2)?,
-                snippet: row.get(3)?,
-                rank: row.get(4)?,
-            })
-        })?.collect::<Result<Vec<_>, _>>()?;
+    pub fn search_notes(db: &Database, query: &str, scope: &str) -> AppResult<Vec<SearchResult>> {
+        if query.trim().is_empty() {
+            return Ok(vec![]);
+        }
+
+        let conn = db.conn();
+        let like_pattern = format!("%{}%", query.replace('%', "\\%").replace('_', "\\_"));
+        let mut results: Vec<SearchResult> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        // 1) Search notes table for title and tags (no FTS needed)
+        match scope {
+            "content" => {} // skip title/tags for content-only
+            _ => {
+                let title_clause = "title LIKE ?1 ESCAPE '\\'";
+                let tags_clause = "tags LIKE ?1 ESCAPE '\\'";
+                let where_sql = match scope {
+                    "title" => title_clause.to_string(),
+                    "tags" => tags_clause.to_string(),
+                    _ => format!("{} OR {}", title_clause, tags_clause),
+                };
+                let sql = format!(
+                    "SELECT id, title, path FROM notes WHERE {} ORDER BY updated_at DESC LIMIT 50",
+                    where_sql
+                );
+                let mut stmt = conn.prepare(&sql)?;
+                let rows = stmt.query_map(params![like_pattern], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                })?;
+                for r in rows {
+                    let (id, title, path) = r?;
+                    if seen.insert(id.clone()) {
+                        results.push(SearchResult { id, title, path, snippet: String::new(), rank: 99.0 });
+                    }
+                }
+            }
+        }
+
+        // 2) Search FTS for content (LIKE on f.content)
+        match scope {
+            "title" | "tags" => {} // skip content for title/tags-only
+            _ => {
+                let sql = "SELECT n.id, n.title, n.path FROM notes n WHERE n.id IN \
+                           (SELECT n2.id FROM notes n2 JOIN notes_fts f ON n2.rowid = f.rowid \
+                            WHERE f.content LIKE ?1 ESCAPE '\\') \
+                           ORDER BY n.updated_at DESC LIMIT 50";
+                let mut stmt = conn.prepare(sql)?;
+                let rows = stmt.query_map(params![like_pattern], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                })?;
+                for r in rows {
+                    let (id, title, path) = r?;
+                    if seen.insert(id.clone()) {
+                        results.push(SearchResult { id, title, path, snippet: String::new(), rank: 50.0 });
+                    }
+                }
+            }
+        }
+
         Ok(results)
+    }
+
+    pub fn list_recent_notes(db: &Database, limit: i64) -> AppResult<Vec<Note>> {
+        let mut stmt = db.conn().prepare(
+            "SELECT id, path, title, folder, tags, created_at, updated_at, word_count, summary, ai_categorized
+             FROM notes ORDER BY updated_at DESC LIMIT ?1"
+        )?;
+        let notes = stmt.query_map(params![limit], |row| {
+            Ok(row_to_note(row))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(notes)
     }
 
     fn query_note_by_id(db: &Database, id: &str) -> AppResult<Note> {
@@ -192,6 +279,11 @@ impl NotebookService {
         }
         Ok(result)
     }
+}
+
+fn dedup_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    let mut seen = std::collections::HashSet::new();
+    results.into_iter().filter(|r| seen.insert(r.id.clone())).collect()
 }
 
 fn row_to_note(row: &rusqlite::Row) -> Note {

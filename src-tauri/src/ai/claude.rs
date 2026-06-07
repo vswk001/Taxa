@@ -2,28 +2,24 @@
 use crate::ai::provider::*;
 use crate::error::{AppError, AppResult};
 use async_trait::async_trait;
-use reqwest::Client;
-use std::time::Duration;
 
 pub struct ClaudeProvider {
-    client: Client,
-    api_url: String,
+    client: reqwest::Client,
+    endpoint: String,
     api_key: String,
     model: String,
 }
 
 impl ClaudeProvider {
     pub fn new(config: &ProviderConfig) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(60))
-            .build()
-            .unwrap_or_else(|_| Client::new());
-        Self {
-            client,
-            api_url: config.api_url.trim_end_matches('/').to_string(),
-            api_key: config.api_key.clone(),
-            model: config.model_name.clone(),
-        }
+        let client = build_client().unwrap_or_else(|_| reqwest::Client::new());
+        // api_url should be the full endpoint, e.g. "https://api.anthropic.com/v1/messages"
+        let endpoint = if config.api_url.contains("/v1/messages") {
+            config.api_url.clone()
+        } else {
+            format!("{}/v1/messages", config.api_url.trim_end_matches('/'))
+        };
+        Self { client, endpoint, api_key: config.api_key.clone(), model: config.model_name.clone() }
     }
 }
 
@@ -39,37 +35,23 @@ struct ClaudeRequest {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct ClaudeMessage {
-    role: String,
-    content: String,
-}
+struct ClaudeMessage { role: String, content: String }
 
 #[derive(serde::Deserialize)]
-struct ClaudeResponse {
-    content: Vec<ClaudeContent>,
-    model: String,
-    usage: Option<ClaudeUsage>,
-}
+struct ClaudeResponse { content: Vec<ClaudeContent>, model: String, usage: Option<ClaudeUsage> }
 
 #[derive(serde::Deserialize)]
-struct ClaudeContent {
-    text: String,
-}
+struct ClaudeContent { text: String }
 
 #[derive(serde::Deserialize)]
-struct ClaudeUsage {
-    input_tokens: u32,
-    output_tokens: u32,
-}
+struct ClaudeUsage { input_tokens: u32, output_tokens: u32 }
 
 #[async_trait]
 impl LlmProvider for ClaudeProvider {
     async fn chat(&self, messages: Vec<Message>, options: ChatOptions) -> AppResult<ChatResponse> {
         let system_msg = messages.iter().find(|m| m.role == "system").map(|m| m.content.clone());
-
         let claude_messages: Vec<ClaudeMessage> = messages
-            .into_iter()
-            .filter(|m| m.role != "system")
+            .into_iter().filter(|m| m.role != "system")
             .map(|m| ClaudeMessage { role: m.role, content: m.content })
             .collect();
 
@@ -81,37 +63,38 @@ impl LlmProvider for ClaudeProvider {
             temperature: Some(options.temperature),
         };
 
-        let url = format!("{}/v1/messages", self.api_url);
-        let resp = self.client.post(&url)
+        let resp = self.client.post(&self.endpoint)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&body)
-            .send().await.map_err(|e| AppError::LlmProvider(format!("Request failed: {}", e)))?;
+            .send().await.map_err(|e| AppError::LlmProvider(format!("Network error: {}", e)))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(AppError::LlmProvider(format!("Claude API error {}: {}", status, body)));
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(AppError::LlmProvider(format!("Claude API {} - {}", status, &body_text[..body_text.len().min(500)])));
         }
 
-        let data: ClaudeResponse = resp.json().await.map_err(|e| AppError::LlmProvider(e.to_string()))?;
+        let data: ClaudeResponse = serde_json::from_str(&body_text)
+            .map_err(|e| AppError::LlmProvider(format!("Parse response failed: {} - {}", e, &body_text[..body_text.len().min(200)])))?;
+
         Ok(ChatResponse {
-            content: data.content.into_iter().map(|c| c.text).collect(),
+            content: data.content.into_iter().map(|c| c.text).collect::<Vec<_>>().join(""),
+            reasoning: None,
             model: data.model,
             usage: data.usage.map(|u| TokenUsage {
-                prompt_tokens: u.input_tokens,
-                completion_tokens: u.output_tokens,
+                prompt_tokens: u.input_tokens, completion_tokens: u.output_tokens,
                 total_tokens: u.input_tokens + u.output_tokens,
             }),
         })
     }
 
     async fn test_connection(&self) -> AppResult<bool> {
-        let resp = self.chat(
-            vec![Message { role: "user".into(), content: "Hi".into() }],
-            ChatOptions { max_tokens: 10, ..Default::default() },
+        let _ = self.chat(
+            vec![Message { role: "user".into(), content: "Say hello in one word.".into() }],
+            ChatOptions { max_tokens: 64, ..Default::default() },
         ).await?;
-        Ok(!resp.content.is_empty())
+        Ok(true)
     }
 }

@@ -20,8 +20,8 @@ export const notebookApi = {
     tauriCommand<import('@/types/notebook').Note[]>('list_notes', { folder }),
   getFolderTree: () =>
     tauriCommand<import('@/types/notebook').Folder[]>('get_folder_tree'),
-  searchNotes: (query: string) =>
-    tauriCommand<import('@/types/notebook').SearchResult[]>('search_notes', { query }),
+  searchNotes: (query: string, scope?: string) =>
+    tauriCommand<import('@/types/notebook').SearchResult[]>('search_notes', { query, scope }),
   createFolder: (parent: string, name: string) =>
     tauriCommand<string>('create_folder', { parent, name }),
   // Rust: rename_folder(path: String, new_name: String)

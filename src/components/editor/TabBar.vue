@@ -21,56 +21,27 @@ import { useNotebookStore } from '@/stores/notebook';
 const editorStore = useEditorStore();
 const notebookStore = useNotebookStore();
 
-async function handleTabClick(tabId: string) {
-  // Save current note before switching
-  if (notebookStore.currentNote && notebookStore.currentNote.note.id !== tabId) {
-    // The editor component will handle saving on blur/change
-  }
-
-  // Set the active tab
+function handleTabClick(tabId: string) {
+  if (editorStore.activeTabId === tabId) return;
   editorStore.setActiveTab(tabId);
-
-  // Load the note content if it's not already loaded
-  if (notebookStore.currentNote?.note.id !== tabId) {
-    try {
-      await notebookStore.openNote(tabId);
-    } catch (error) {
-      console.error('Failed to load note:', error);
-    }
-  }
 }
 
 async function handleNewNote() {
   try {
-    // Get the current folder or use default
     const folder = notebookStore.currentFolder || (notebookStore.folders[0]?.path || '未分类');
-
-    // Create a new note
-    const note = await notebookStore.createNote(folder, '新笔记', '');
-
-    if (note) {
-      // Open it in the editor
-      editorStore.openTab(note.id, note.title);
-      await notebookStore.openNote(note.id);
-    }
+    await notebookStore.createNote(folder, '新笔记', '');
   } catch (error) {
     console.error('Failed to create new note:', error);
   }
 }
 
-async function handleCloseTab(tabId: string) {
-  // Close the tab in the editor store
+function handleCloseTab(tabId: string) {
   editorStore.closeTab(tabId);
 
-  // If we closed the current note, clear it or switch to another
-  if (notebookStore.currentNote?.note.id === tabId) {
-    // Check if there's a new active tab
-    if (editorStore.activeTabId) {
-      await notebookStore.openNote(editorStore.activeTabId);
-    } else {
-      // No more tabs, clear current note
-      notebookStore.currentNote = null;
-    }
+  if (editorStore.activeTabId && editorStore.activeTabId !== '__graph__') {
+    notebookStore.openNote(editorStore.activeTabId);
+  } else if (!editorStore.activeTabId) {
+    notebookStore.currentNote = null;
   }
 }
 </script>

@@ -6,6 +6,7 @@ export const useEditorStore = defineStore('editor', () => {
   const openTabs = ref<{ id: string; title: string }[]>([]);
   const activeTabId = ref<string | null>(null);
   const isModified = ref(false);
+  let savePromise: Promise<void> | null = null;
 
   function openTab(id: string, title: string) {
     if (!openTabs.value.find(t => t.id === id)) {
@@ -27,5 +28,21 @@ export const useEditorStore = defineStore('editor', () => {
     }
   }
 
-  return { openTabs, activeTabId, isModified, openTab, closeTab, setActiveTab };
+  function setSavePromise(p: Promise<void> | null) {
+    savePromise = p;
+  }
+
+  async function waitForSave() {
+    if (savePromise) {
+      await savePromise;
+      savePromise = null;
+    }
+  }
+
+  function updateTabTitle(id: string, title: string) {
+    const tab = openTabs.value.find(t => t.id === id);
+    if (tab) tab.title = title;
+  }
+
+  return { openTabs, activeTabId, isModified, openTab, closeTab, setActiveTab, setSavePromise, waitForSave, updateTabTitle };
 });
