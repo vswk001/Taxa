@@ -11,8 +11,8 @@
         @keydown.escape="$emit('cancel')"
       />
       <div class="dialog-actions">
-        <button class="dialog-btn cancel" @click="$emit('cancel')">取消</button>
-        <button class="dialog-btn confirm" @click="$emit('confirm', value)">确定</button>
+        <button class="dialog-btn cancel" @click="$emit('cancel')">{{ t('common.cancel') }}</button>
+        <button class="dialog-btn confirm" @click="$emit('confirm', value)">{{ t('common.confirm') }}</button>
       </div>
     </div>
   </div>
@@ -20,6 +20,9 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();;
 
 const props = defineProps<{
   visible: boolean;

@@ -8,16 +8,18 @@
       @click="handleTabClick(tab.id)"
     >
       <span class="tab-title">{{ tab.title }}</span>
-      <button class="tab-close" @click.stop="handleCloseTab(tab.id)" title="关闭标签">×</button>
+      <button class="tab-close" @click.stop="handleCloseTab(tab.id)" :title="t('editor.closeTab')">×</button>
     </div>
-    <button class="tab-new" @click="handleNewNote" title="新建笔记">+</button>
+    <button class="tab-new" @click="handleNewNote" :title="t('editor.newNoteTitle')">+</button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { useEditorStore } from '@/stores/editor';
 import { useNotebookStore } from '@/stores/notebook';
 
+const { t } = useI18n();
 const editorStore = useEditorStore();
 const notebookStore = useNotebookStore();
 
@@ -28,8 +30,8 @@ function handleTabClick(tabId: string) {
 
 async function handleNewNote() {
   try {
-    const folder = notebookStore.currentFolder || (notebookStore.folders[0]?.path || '未分类');
-    await notebookStore.createNote(folder, '新笔记', '');
+    const folder = notebookStore.currentFolder || (notebookStore.folders[0]?.path || t('tree.Uncategorized'));
+    await notebookStore.createNote(folder, t('editor.newTab'), '');
   } catch (error) {
     console.error('Failed to create new note:', error);
   }

@@ -4,7 +4,7 @@
       <div class="search-input-wrap">
         <input
           v-model="query"
-          placeholder="搜索笔记..."
+          :placeholder="t('search.placeholder')"
           @input="handleSearch"
           ref="inputRef"
           @focus="showScopeHint = true"
@@ -24,7 +24,7 @@
         <div v-if="r.snippet" class="result-snippet" v-html="r.snippet"></div>
         <div class="result-path">{{ r.path }}</div>
       </div>
-      <div v-if="query && !debouncing && notebookStore.searchResults.length === 0" class="no-results">无结果</div>
+      <div v-if="query && !debouncing && notebookStore.searchResults.length === 0" class="no-results">{{ t('search.noResults') }}</div>
     </div>
 
     <!-- Scope dropdown (rendered outside panel via Teleport) -->
@@ -44,7 +44,7 @@
           @click="selectScope(opt.value)"
         >
           <span class="scope-icon">{{ opt.icon }}</span>
-          {{ opt.label }}
+          {{ t(opt.labelKey) }}
         </button>
       </div>
     </Teleport>
@@ -53,11 +53,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ close: [] }>();
+const { t } = useI18n();
 const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
 const query = ref('');
@@ -69,13 +71,16 @@ const inputRef = ref<HTMLInputElement>();
 const scopeBtnRef = ref<HTMLButtonElement>();
 
 const scopeOptions = [
-  { value: 'all', label: '全部', icon: '🔍' },
-  { value: 'title', label: '标题', icon: '📋' },
-  { value: 'content', label: '内容', icon: '📝' },
-  { value: 'tags', label: '标签', icon: '🏷' },
+  { value: 'all', labelKey: 'search.scopeAll', icon: '🔍' },
+  { value: 'title', labelKey: 'search.scopeTitle', icon: '📋' },
+  { value: 'content', labelKey: 'search.scopeContent', icon: '📝' },
+  { value: 'tags', labelKey: 'search.scopeTags', icon: '🏷' },
 ];
 
-const scopeLabel = computed(() => scopeOptions.find(o => o.value === scope.value)?.label || '全部');
+const scopeLabel = computed(() => {
+  const opt = scopeOptions.find(o => o.value === scope.value);
+  return opt ? t(opt.labelKey) : t('search.scopeAll');
+});
 
 const dropdownPos = ref({ top: 0, left: 0 });
 

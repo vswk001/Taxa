@@ -2,10 +2,10 @@
   <div class="folder-file-list">
     <div class="folder-header">
       <h3 class="folder-title">{{ folderName }}</h3>
-      <span class="note-count">{{ notes.length }} 篇笔记</span>
+      <span class="note-count">{{ t('folder.noteCount', { count: notes.length }) }}</span>
     </div>
     <div v-if="notes.length === 0" class="empty-folder">
-      <p>此目录下暂无笔记</p>
+      <p>{{ t('folder.emptyFolder') }}</p>
     </div>
     <div v-else class="note-cards">
       <div
@@ -15,7 +15,7 @@
         @click="handleClick(note)"
       >
         <div class="card-title">{{ note.title }}</div>
-        <div class="card-summary">{{ note.summary || '暂无摘要' }}</div>
+        <div class="card-summary">{{ note.summary || t('folder.noSummary') }}</div>
         <div v-if="note.tags.length" class="card-tags">
           <span v-for="tag in note.tags" :key="tag" class="card-tag">{{ tag }}</span>
         </div>
@@ -30,10 +30,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 import type { Note } from '@/types/notebook';
 
+const { t } = useI18n();
 const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
 

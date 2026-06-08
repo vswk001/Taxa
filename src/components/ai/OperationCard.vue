@@ -1,22 +1,25 @@
 <!-- src/components/ai/OperationCard.vue -->
 <template>
   <div class="operation-card">
-    <div class="card-title">AI 建议操作</div>
+    <div class="card-title">{{ t('ai.aiSuggestion') }}</div>
     <div class="card-body">
-      <div class="field"><span class="label">操作：</span>{{ suggestion.action === 'create' ? '新建笔记' : '追加到已有笔记' }}</div>
-      <div class="field"><span class="label">标题：</span>{{ suggestion.title }}</div>
-      <div class="field"><span class="label">归类：</span>{{ suggestion.folder }}</div>
-      <div class="field"><span class="label">标签：</span>{{ suggestion.tags?.join(', ') }}</div>
+      <div class="field"><span class="label">{{ t('ai.actionLabel') }}</span>{{ suggestion.action === 'create' ? t('ai.actionCreate') : t('ai.actionAppend') }}</div>
+      <div class="field"><span class="label">{{ t('ai.titleLabel') }}</span>{{ suggestion.title }}</div>
+      <div class="field"><span class="label">{{ t('ai.folderLabel') }}</span>{{ suggestion.folder }}</div>
+      <div class="field"><span class="label">{{ t('ai.tagsLabel') }}</span>{{ suggestion.tags?.join(', ') }}</div>
     </div>
     <div class="card-actions">
-      <button class="btn-confirm" @click="emit('confirm')">确认</button>
-      <button class="btn-dismiss" @click="emit('dismiss')">忽略</button>
+      <button class="btn-confirm" @click="emit('confirm')">{{ t('ai.confirmAction') }}</button>
+      <button class="btn-dismiss" @click="emit('dismiss')">{{ t('ai.dismissAction') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import type { AiSuggestion } from '@/types/ai';
+
+const { t } = useI18n();
 
 defineProps<{ suggestion: AiSuggestion }>();
 const emit = defineEmits<{ confirm: []; dismiss: [] }>();

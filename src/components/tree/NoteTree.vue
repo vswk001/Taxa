@@ -1,15 +1,15 @@
 <template>
   <div class="note-tree" @click="handleGlobalClick">
     <div class="tree-header">
-      <span>笔记</span>
+      <span>{{ t('tree.notes') }}</span>
       <div class="header-actions">
-        <button @click="handleNewNote" title="新建笔记">
+        <button @click="handleNewNote" :title="t('tree.newNote')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         </button>
-        <button @click="handleNewFolder" title="新建文件夹">
+        <button @click="handleNewFolder" :title="t('tree.newFolder')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         </button>
-        <button @click="toggleExpandAll" :title="isAllExpanded ? '全部收缩' : '全部展开'">
+        <button @click="toggleExpandAll" :title="isAllExpanded ? t('tree.collapseAll') : t('tree.expandAll')">
           <svg v-if="isAllExpanded" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         </button>
@@ -18,8 +18,8 @@
 
     <div class="tree-content">
       <div v-if="notebookStore.folders.length === 0" class="empty-state">
-        <p>暂无文件夹</p>
-        <button class="create-first-btn" @click="handleNewFolder">创建第一个文件夹</button>
+        <p>{{ t('tree.noFolders') }}</p>
+        <button class="create-first-btn" @click="handleNewFolder">{{ t('tree.createFirst') }}</button>
       </div>
 
       <TreeNode
@@ -45,22 +45,22 @@
       @click.stop
     >
       <div v-if="contextMenu.type === 'folder'" class="menu-items">
-        <button @click="handleMenuAction('new-note')">新建笔记</button>
-        <button @click="handleMenuAction('new-subfolder')">新建子文件夹</button>
+        <button @click="handleMenuAction('new-note')">{{ t('tree.newNote') }}</button>
+        <button @click="handleMenuAction('new-subfolder')">{{ t('tree.newSubfolder') }}</button>
         <div class="menu-separator"></div>
-        <button @click="handleMenuAction('import-file')">导入文件...</button>
-        <button @click="handleMenuAction('import-folder')">导入目录...</button>
-        <button @click="handleMenuAction('export-folder')">导出目录...</button>
+        <button @click="handleMenuAction('import-file')">{{ t('tree.importFile') }}</button>
+        <button @click="handleMenuAction('import-folder')">{{ t('tree.importFolder') }}</button>
+        <button @click="handleMenuAction('export-folder')">{{ t('tree.exportFolder') }}</button>
         <div class="menu-separator"></div>
-        <button @click="handleMenuAction('rename')">重命名</button>
-        <button @click="handleMenuAction('delete')" class="danger">删除</button>
+        <button @click="handleMenuAction('rename')">{{ t('common.rename') }}</button>
+        <button @click="handleMenuAction('delete')" class="danger">{{ t('common.delete') }}</button>
       </div>
       <div v-if="contextMenu.type === 'note'" class="menu-items">
-        <button @click="handleMenuAction('rename-note')">重命名</button>
-        <button @click="handleMenuAction('move-note')">移动到...</button>
-        <button @click="handleMenuAction('export-note')">导出为文件...</button>
+        <button @click="handleMenuAction('rename-note')">{{ t('common.rename') }}</button>
+        <button @click="handleMenuAction('move-note')">{{ t('tree.moveNoteTitle') }}...</button>
+        <button @click="handleMenuAction('export-note')">{{ t('tree.exportNote') }}</button>
         <div class="menu-separator"></div>
-        <button @click="handleMenuAction('delete-note')" class="danger">删除</button>
+        <button @click="handleMenuAction('delete-note')" class="danger">{{ t('common.delete') }}</button>
       </div>
     </div>
 
@@ -77,6 +77,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 import { invoke } from '@tauri-apps/api/core';
@@ -85,6 +86,7 @@ import TreeNode from './TreeNode.vue';
 import InputDialog from '@/components/common/InputDialog.vue';
 import type { Folder, Note } from '@/types/notebook';
 
+const { t } = useI18n();
 const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
 
@@ -181,8 +183,8 @@ async function handleNoteClick(note: Note) {
 
 async function handleNewNote() {
   try {
-    const folder = notebookStore.currentFolder || (notebookStore.folders[0]?.path || '未分类');
-    const title = await showInputDialog({ title: '新建笔记', placeholder: '笔记标题', defaultValue: '新笔记' });
+    const folder = notebookStore.currentFolder || (notebookStore.folders[0]?.path || t('tree.Uncategorized'));
+    const title = await showInputDialog({ title: t('tree.newNoteTitle'), placeholder: t('tree.newNotePlaceholder'), defaultValue: t('tree.newNoteDefault') });
     if (!title) return;
     const note = await notebookStore.createNote(folder, title, '');
     if (note) {
@@ -191,18 +193,18 @@ async function handleNewNote() {
     }
   } catch (e: any) {
     console.error('Failed to create note:', e);
-    await tauriMessage(e.message || String(e), { title: '创建笔记失败', kind: 'error' });
+    await tauriMessage(e.message || String(e), { title: t('tree.createNoteFailed'), kind: 'error' });
   }
 }
 
 async function handleNewFolder() {
-  const name = await showInputDialog({ title: '新建文件夹', placeholder: '文件夹名称' });
+  const name = await showInputDialog({ title: t('tree.newFolderTitle'), placeholder: t('tree.newFolderPlaceholder') });
   if (name?.trim()) {
     try {
       await notebookStore.createFolder(notebookStore.currentFolder || '', name.trim());
       await notebookStore.loadFolderTree();
     } catch (e: any) {
-      await tauriMessage(e.message || String(e), { title: '创建文件夹失败', kind: 'error' });
+      await tauriMessage(e.message || String(e), { title: t('tree.createFolderFailed'), kind: 'error' });
     }
   }
 }
@@ -227,7 +229,7 @@ async function handleMenuAction(action: string) {
   try {
     if (action === 'new-note' && 'path' in target) {
       const folder = target as Folder;
-      const title = await showInputDialog({ title: '新建笔记', placeholder: '笔记标题', defaultValue: '新笔记' });
+      const title = await showInputDialog({ title: t('tree.newNoteTitle'), placeholder: t('tree.newNotePlaceholder'), defaultValue: t('tree.newNoteDefault') });
       if (title) {
         const note = await notebookStore.createNote(folder.path, title, '');
         if (note) {
@@ -237,14 +239,14 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'new-subfolder' && 'path' in target) {
       const folder = target as Folder;
-      const name = await showInputDialog({ title: '新建子文件夹', placeholder: '子文件夹名称' });
+      const name = await showInputDialog({ title: t('tree.newSubfolderTitle'), placeholder: t('tree.newSubfolderPlaceholder') });
       if (name) {
         await notebookStore.createFolder(folder.path, name);
         await notebookStore.loadFolderTree();
       }
     } else if (action === 'rename' && 'path' in target && 'name' in target) {
       const folder = target as Folder;
-      const newName = await showInputDialog({ title: '重命名文件夹', placeholder: '新名称', defaultValue: folder.name });
+      const newName = await showInputDialog({ title: t('tree.renameFolderTitle'), placeholder: t('tree.renamePlaceholder'), defaultValue: folder.name });
       if (newName && newName !== folder.name) {
         await notebookStore.renameFolder(folder.path, newName);
         await notebookStore.loadFolderTree();
@@ -252,7 +254,7 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'delete' && 'path' in target && 'name' in target) {
       const folder = target as Folder;
-      const yes = await tauriConfirm(`确定要删除文件夹 "${folder.name}" 及其所有内容吗?`, { title: '删除确认', kind: 'warning' });
+      const yes = await tauriConfirm(t('tree.deleteFolderConfirm', { name: folder.name }), { title: t('tree.deleteConfirmTitle'), kind: 'warning' });
       if (yes) {
         await notebookStore.deleteFolder(folder.path);
         notebookStore.currentFolder = '';
@@ -261,7 +263,7 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'rename-note' && 'id' in target) {
       const note = target as Note;
-      const newTitle = await showInputDialog({ title: '重命名笔记', placeholder: '新标题', defaultValue: note.title });
+      const newTitle = await showInputDialog({ title: t('tree.renameNoteTitle'), placeholder: t('tree.renameNotePlaceholder'), defaultValue: note.title });
       if (newTitle && newTitle !== note.title) {
         await notebookStore.renameNote(note.id, newTitle);
         await loadAllNotes();
@@ -271,7 +273,7 @@ async function handleMenuAction(action: string) {
       const note = target as Note;
       const folders = notebookStore.folders;
       const folderPaths = folders.map(f => f.path).join(', ');
-      const targetFolder = await showInputDialog({ title: '移动笔记', placeholder: folderPaths });
+      const targetFolder = await showInputDialog({ title: t('tree.moveNoteTitle'), placeholder: folderPaths });
       if (targetFolder) {
         await notebookStore.moveNote(note.id, targetFolder);
         await loadAllNotes();
@@ -279,7 +281,7 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'delete-note' && 'id' in target) {
       const note = target as Note;
-      const yes = await tauriConfirm(`确定要删除笔记 "${note.title}" 吗?`, { title: '删除确认', kind: 'warning' });
+      const yes = await tauriConfirm(t('tree.deleteNoteConfirm', { title: note.title }), { title: t('tree.deleteConfirmTitle'), kind: 'warning' });
       if (yes) {
         await notebookStore.deleteNote(note.id);
         editorStore.closeTab(note.id);
@@ -314,7 +316,7 @@ async function handleMenuAction(action: string) {
     }
   } catch (e: any) {
     console.error('Menu action failed:', e);
-    await tauriMessage(e.message || String(e), { title: '操作失败', kind: 'error' });
+    await tauriMessage(e.message || String(e), { title: t('tree.operationFailed'), kind: 'error' });
   }
 }
 

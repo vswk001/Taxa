@@ -5,11 +5,11 @@
         <input
           v-model="localTitle"
           class="title-input"
-          placeholder="笔记标题..."
+          :placeholder="t('editor.titlePlaceholder')"
           @blur="saveTitle"
           @keyup.enter="saveTitle"
         />
-        <span class="note-meta">{{ wordCount }} 字</span>
+        <span class="note-meta">{{ t('editor.wordCount', { count: wordCount }) }}</span>
       </div>
       <div class="tag-row">
         <span
@@ -25,7 +25,7 @@
             ref="tagInputRef"
             v-model="newTag"
             class="tag-input"
-            placeholder="标签名"
+            placeholder="Tag"
             @keydown.enter.prevent="addTag"
             @keydown.escape="tagInputVisible = false"
             @blur="addTag"
@@ -35,7 +35,7 @@
       </div>
     </div>
     <div v-else class="note-header">
-      <span class="no-note-message">选择或创建一个笔记开始编辑</span>
+      <span class="no-note-message">{{ t('editor.noNote') }}</span>
     </div>
 
     <EditorSearch
@@ -49,8 +49,8 @@
     </div>
     <div v-else class="editor-placeholder">
       <div class="placeholder-content">
-        <p>暂无选中的笔记</p>
-        <p class="hint">从左侧选择笔记，或点击 "+" 创建新笔记</p>
+        <p>{{ t('editor.placeholder') }}</p>
+        <p class="hint">{{ t('editor.placeholderHint') }}</p>
       </div>
     </div>
   </div>
@@ -58,11 +58,13 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onBeforeUnmount, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 import MilkdownEditor from './MilkdownEditor.vue';
 import EditorSearch from './EditorSearch.vue';
 
+const { t } = useI18n();
 const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
 const localTitle = ref('');
@@ -333,9 +335,10 @@ onBeforeUnmount(() => {
 
 .editor-body {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .editor-placeholder {

@@ -1,13 +1,13 @@
 <template>
   <div class="chat-area">
     <div v-if="messages.length === 0" class="empty-chat">
-      <p>在这里输入内容，AI 将自动归类和完善</p>
+      <p>{{ t('ai.emptyChat') }}</p>
     </div>
     <div v-for="msg in messages" :key="msg.id" :class="['message', msg.role]">
       <div v-if="msg.reasoning" class="thinking-card" :class="{ collapsed: !expandedMap[msg.id] }">
         <div class="thinking-header" @click="expandedMap[msg.id] = !expandedMap[msg.id]">
           <svg class="chevron" :class="{ rotated: expandedMap[msg.id] }" viewBox="0 0 24 24" width="14" height="14"><polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="thinking-label">思考过程</span>
+          <span class="thinking-label">{{ t('ai.thinkingProcess') }}</span>
           <span class="thinking-duration" v-if="!expandedMap[msg.id]">{{ preview(msg.reasoning) }}</span>
         </div>
         <div v-if="expandedMap[msg.id]" class="thinking-body">
@@ -15,6 +15,9 @@
         </div>
       </div>
       <div class="message-content">{{ msg.content }}</div>
+      <div v-if="msg.attachments?.length" class="msg-attachments">
+        <span v-for="a in msg.attachments" :key="a.name" class="msg-file-chip">📎 {{ a.name }}</span>
+      </div>
       <OperationCard
         v-if="msg.suggestions?.length"
         :suggestion="msg.suggestions[0]"
@@ -27,9 +30,12 @@
 
 <script setup lang="ts">
 import { reactive } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { ChatMessage, AiSuggestion } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
 import OperationCard from './OperationCard.vue';
+
+const { t } = useI18n();
 
 defineProps<{ messages: ChatMessage[] }>();
 const emit = defineEmits<{ apply: [result: OrganizeResult]; dismiss: [] }>();
@@ -57,6 +63,12 @@ function toResult(s: AiSuggestion): OrganizeResult {
 .message.assistant { background: var(--bg-secondary); }
 .message.system { background: var(--bg-secondary); font-style: italic; color: var(--text-secondary); font-size: 12px; }
 .message-content { white-space: pre-wrap; }
+.msg-attachments { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.msg-file-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: rgba(255,255,255,0.15);
+}
+.message:not(.user) .msg-file-chip { background: var(--bg-secondary); }
 
 /* Thinking card */
 .thinking-card {

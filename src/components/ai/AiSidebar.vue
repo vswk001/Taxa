@@ -1,10 +1,10 @@
 <template>
   <div class="ai-sidebar">
     <div class="sidebar-header">
-      <span>AI 助手</span>
+      <span>{{ t('ai.assistant') }}</span>
       <div class="header-actions">
-        <button v-if="aiStore.messages.length > 0" @click="aiStore.clearMessages()" title="清空对话">🗑</button>
-        <button :class="{ active: showConfig }" @click="showConfig = !showConfig" title="LLM 配置">
+        <button v-if="aiStore.messages.length > 0" @click="aiStore.clearMessages()" :title="t('ai.clearChat')">🗑</button>
+        <button :class="{ active: showConfig }" @click="showConfig = !showConfig" :title="t('ai.llmConfig')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
@@ -13,24 +13,24 @@
     <!-- LLM Config Panel -->
     <div v-if="showConfig" class="config-panel">
       <div v-if="settingsStore.providers.length === 0" class="no-providers">
-        <p>尚未配置 LLM 提供商</p>
-        <p class="hint">配置后可使用 AI 助手功能</p>
+        <p>{{ t('ai.noProviders') }}</p>
+        <p class="hint">{{ t('ai.noProvidersHint') }}</p>
       </div>
       <div class="provider-list">
         <div v-for="p in settingsStore.providers" :key="p.id" class="provider-item">
           <div class="provider-info">
             <span class="provider-name">{{ p.name }}</span>
             <span class="provider-model">{{ p.model_name }}</span>
-            <span v-if="p.is_default" class="provider-default">默认</span>
+            <span v-if="p.is_default" class="provider-default">{{ t('common.default') }}</span>
           </div>
           <div class="provider-actions">
-            <button v-if="!p.is_default" @click="setDefault(p.id)">设为默认</button>
-            <button @click="handleEdit(p)">编辑</button>
-            <button class="danger" @click="handleDelete(p.id)">删除</button>
+            <button v-if="!p.is_default" @click="setDefault(p.id)">{{ t('ai.setDefault') }}</button>
+            <button @click="handleEdit(p)">{{ t('common.edit') }}</button>
+            <button class="danger" @click="handleDelete(p.id)">{{ t('common.delete') }}</button>
           </div>
         </div>
       </div>
-      <button v-if="!showForm" class="btn-add" @click="openAddForm">+ 添加提供商</button>
+      <button v-if="!showForm" class="btn-add" @click="openAddForm">{{ t('ai.addProvider') }}</button>
       <LlmProviderForm v-if="showForm" :initial-data="editingProvider" @save="handleSave" @cancel="showForm = false" />
     </div>
 
@@ -38,16 +38,17 @@
     <template v-else>
       <ChatArea :messages="aiStore.messages" @apply="aiStore.applyResult($event)" @dismiss="aiStore.dismiss()" />
       <div v-if="aiStore.isProcessing" class="processing-bar">
-        <span class="processing-text">AI 处理中...</span>
-        <button class="cancel-btn" @click="aiStore.cancel()">取消</button>
+        <span class="processing-text">{{ t('ai.processing') }}</span>
+        <button class="cancel-btn" @click="aiStore.cancel()">{{ t('ai.cancel') }}</button>
       </div>
-      <ChatInput :disabled="aiStore.isProcessing" @submit="aiStore.submitInput($event)" />
+      <ChatInput :disabled="aiStore.isProcessing" @submit="(c: string, a: any) => aiStore.submitInput(c, a)" />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAiStore } from '@/stores/ai';
 import { useSettingsStore } from '@/stores/settings';
 import { invoke } from '@tauri-apps/api/core';
@@ -56,6 +57,7 @@ import ChatArea from './ChatArea.vue';
 import ChatInput from './ChatInput.vue';
 import LlmProviderForm from '@/components/settings/LlmProviderForm.vue';
 
+const { t } = useI18n();
 const aiStore = useAiStore();
 const settingsStore = useSettingsStore();
 const showConfig = ref(false);
@@ -70,7 +72,7 @@ async function handleSave(form: any) {
     showForm.value = false;
     editingProvider.value = null;
   } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: '保存失败', kind: 'error' });
+    await tauriMessage(e.message || String(e), { title: t('ai.saveFailed'), kind: 'error' });
   }
 }
 
@@ -85,9 +87,9 @@ function handleEdit(p: any) {
 }
 
 async function handleDelete(id: string) {
-  const yes = await tauriConfirm('确定要删除这个提供商吗?', { title: '删除确认', kind: 'warning' });
+  const yes = await tauriConfirm(t('ai.deleteProviderConfirm'), { title: t('ai.deleteConfirmTitle'), kind: 'warning' });
   if (yes) {
-    try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: '删除失败', kind: 'error' }); }
+    try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
   }
 }
 
@@ -103,7 +105,7 @@ async function setDefault(id: string) {
     }
     await settingsStore.loadProviders();
   } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: '设置失败', kind: 'error' });
+    await tauriMessage(e.message || String(e), { title: t('ai.setDefaultFailed'), kind: 'error' });
   }
 }
 </script>

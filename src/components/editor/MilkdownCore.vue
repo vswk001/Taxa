@@ -4,11 +4,14 @@
 
 <script setup lang="ts">
 import { watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Milkdown, useEditor, useInstance } from '@milkdown/vue';
 import { Crepe } from '@milkdown/crepe';
 import '@milkdown/crepe/theme/classic.css';
 import '@milkdown/crepe/theme/common/style.css';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+
+const { t } = useI18n();
 
 const props = defineProps<{ modelValue: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -30,7 +33,7 @@ useEditor((container) => {
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: {
-        text: '开始写作...',
+        text: t('editor.startWriting'),
       },
     },
   });
@@ -97,14 +100,12 @@ watch(() => props.modelValue, (newValue) => {
   --crepe-font-code: var(--font-mono);
 
   height: 100%;
-  overflow-y: auto;
 }
 
 .milkdown .ProseMirror {
   padding: 24px 32px !important;
   font-size: 15px;
   line-height: 1.7;
-  min-height: 100%;
 }
 
 .milkdown .ProseMirror p {

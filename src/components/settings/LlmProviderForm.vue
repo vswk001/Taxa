@@ -1,53 +1,56 @@
 <template>
   <div class="provider-form">
     <div class="form-group">
-      <label>名称</label>
-      <input v-model="form.name" placeholder="例如: 我的 Claude" />
+      <label>{{ t('llmForm.name') }}</label>
+      <input v-model="form.name" :placeholder="t('llmForm.namePlaceholder')" />
     </div>
     <div class="form-group">
-      <label>类型</label>
+      <label>{{ t('llmForm.type') }}</label>
       <select v-model="form.provider_type" @change="updateDefaults">
-        <option value="claude">Claude (Anthropic)</option>
-        <option value="openai">OpenAI</option>
-        <option value="openai_compatible">OpenAI 兼容</option>
-        <option value="glm">智谱 GLM</option>
-        <option value="deepseek">DeepSeek</option>
-        <option value="minimax">MiniMax</option>
-        <option value="kimi">Kimi (Moonshot)</option>
-        <option value="custom">自定义</option>
+        <option value="claude">{{ t('llmForm.typeClaude') }}</option>
+        <option value="openai">{{ t('llmForm.typeOpenai') }}</option>
+        <option value="openai_compatible">{{ t('llmForm.typeOpenaiCompatible') }}</option>
+        <option value="glm">{{ t('llmForm.typeGlm') }}</option>
+        <option value="deepseek">{{ t('llmForm.typeDeepseek') }}</option>
+        <option value="minimax">{{ t('llmForm.typeMinimax') }}</option>
+        <option value="kimi">{{ t('llmForm.typeKimi') }}</option>
+        <option value="custom">{{ t('llmForm.typeCustom') }}</option>
       </select>
     </div>
     <div class="form-group">
-      <label>API 地址</label>
+      <label>{{ t('llmForm.apiUrl') }}</label>
       <input v-model="form.api_url" :placeholder="urlPlaceholder" />
       <span class="hint">{{ urlHint }}</span>
     </div>
     <div class="form-group">
-      <label>API Key</label>
-      <input v-model="form.api_key" type="password" :placeholder="initialData?.id ? '留空保持不变' : 'sk-...'" />
+      <label>{{ t('llmForm.apiKey') }}</label>
+      <input v-model="form.api_key" type="password" :placeholder="initialData?.id ? t('llmForm.apiKeyPlaceholder') : 'sk-...'" />
     </div>
     <div class="form-group">
-      <label>模型</label>
+      <label>{{ t('llmForm.model') }}</label>
       <input v-model="form.model_name" :placeholder="modelPlaceholder" />
     </div>
     <div class="form-group">
-      <label><input type="checkbox" v-model="form.is_default" /> 设为默认</label>
+      <label><input type="checkbox" v-model="form.is_default" /> {{ t('llmForm.setDefault') }}</label>
     </div>
     <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
     <div class="form-actions">
       <button class="btn-test" @click="testConnection" :disabled="testing">
-        {{ testing ? '测试中...' : '测试连接' }}
+        {{ testing ? t('llmForm.testing') : t('llmForm.testConnection') }}
       </button>
-      <button class="btn-save" @click="handleSave">保存</button>
-      <button class="btn-cancel" @click="emit('cancel')">取消</button>
+      <button class="btn-save" @click="handleSave">{{ t('llmForm.save') }}</button>
+      <button class="btn-cancel" @click="emit('cancel')">{{ t('common.cancel') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { LlmProviderForm } from '@/types/settings';
 import { useSettingsStore } from '@/stores/settings';
+
+const { t } = useI18n();
 
 const props = defineProps<{ initialData?: LlmProviderForm & { id?: string } }>();
 const emit = defineEmits<{ save: [form: LlmProviderForm & { id?: string }]; cancel: [] }>();
@@ -78,12 +81,12 @@ const urlPlaceholder = computed(() => {
 
 const urlHint = computed(() => {
   switch (form.value.provider_type) {
-    case 'claude': return 'Anthropic API 地址，留空使用默认';
-    case 'openai': return 'OpenAI API 地址，留空使用默认';
-    case 'glm': return '智谱 API 地址，留空使用默认';
-    case 'deepseek': return 'DeepSeek API 地址，留空使用默认';
-    case 'openai_compatible': return '填写兼容 OpenAI 格式的完整 API 地址';
-    default: return '填写完整的 API 地址';
+    case 'claude': return t('llmForm.urlHintClaude');
+    case 'openai': return t('llmForm.urlHintOpenai');
+    case 'glm': return t('llmForm.urlHintGlm');
+    case 'deepseek': return t('llmForm.urlHintDeepseek');
+    case 'openai_compatible': return t('llmForm.urlHintCompatible');
+    default: return t('llmForm.urlHintCustom');
   }
 });
 
@@ -118,18 +121,18 @@ async function testConnection() {
       // Show success briefly
       testing.value = false;
     } else {
-      errorMsg.value = '连接失败：未收到有效响应';
+      errorMsg.value = t('llmForm.connectionFailed');
     }
   } catch (e: any) {
-    errorMsg.value = '连接失败: ' + (e.message || String(e));
+    errorMsg.value = t('llmForm.connectionFailedPrefix') + (e.message || String(e));
   } finally {
     testing.value = false;
   }
 }
 
 function handleSave() {
-  if (!form.value.name.trim()) { errorMsg.value = '请输入名称'; return; }
-  if (!form.value.api_key.trim() && !props.initialData?.id) { errorMsg.value = '请输入 API Key'; return; }
+  if (!form.value.name.trim()) { errorMsg.value = t('llmForm.nameRequired'); return; }
+  if (!form.value.api_key.trim() && !props.initialData?.id) { errorMsg.value = t('llmForm.apiKeyRequired'); return; }
   if (!form.value.model_name.trim()) {
     form.value.model_name = modelPlaceholder.value;
   }

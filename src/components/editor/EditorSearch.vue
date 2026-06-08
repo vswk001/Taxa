@@ -4,18 +4,21 @@
       ref="inputRef"
       v-model="query"
       class="search-input"
-      placeholder="搜索..."
+      :placeholder="t('search.placeholder')"
       @input="debouncedSearch"
     />
     <span class="search-count">{{ matchText }}</span>
-    <button class="search-btn" @click="findPrev" title="上一个 (Shift+Enter)">▲</button>
-    <button class="search-btn" @click="findNext" title="下一个 (Enter)">▼</button>
-    <button class="search-btn close-btn" @click="emit('close')" title="关闭 (Escape)">✕</button>
+    <button class="search-btn" @click="findPrev">▲</button>
+    <button class="search-btn" @click="findNext">▼</button>
+    <button class="search-btn close-btn" @click="emit('close')">✕</button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const props = defineProps<{ visible: boolean; container: HTMLElement | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -30,7 +33,7 @@ const supportsHighlight = typeof CSS !== 'undefined' && 'highlights' in CSS;
 
 const matchText = computed(() => {
   if (!query.value) return '';
-  if (matchRanges.value.length === 0) return '无匹配';
+  if (matchRanges.value.length === 0) return t('search.noResults');
   return `${matchIndex.value + 1}/${matchRanges.value.length}`;
 });
 

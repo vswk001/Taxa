@@ -11,3 +11,29 @@ body { font-family: var(--font-sans); color: var(--text-primary); background: va
 
 button { cursor: pointer; border: none; background: none; font-family: inherit; }
 input, textarea { font-family: inherit; }
+
+::selection { background: #5a9ad8; }
+[data-theme="dark"] ::selection { background: #5ba0e9; }
+.ProseMirror ::selection { background: #5a9ad8 !important; }
+[data-theme="dark"] .ProseMirror ::selection { background: #5ba0e9 !important; }
+
+/* RTL support */
+[dir="rtl"] .activity-bar { direction: rtl; }
+[dir="rtl"] .note-tree { direction: rtl; }
+[dir="rtl"] .tree-header { direction: rtl; }
+[dir="rtl"] .settings-dialog { direction: rtl; }
+[dir="rtl"] .settings-tab { border-left: none; border-right: 2px solid transparent; }
+[dir="rtl"] .settings-tab.active { border-left: none; border-right-color: var(--accent-color); }
+[dir="rtl"] .ai-sidebar { border-left: none; border-right: 1px solid var(--border-color); }
+[dir="rtl"] .provider-info { direction: rtl; }
+[dir="rtl"] .context-menu { direction: rtl; }
+[dir="rtl"] .search-panel { direction: rtl; }
+[dir="rtl"] .note-editor { direction: rtl; }
+[dir="rtl"] .tag-row { direction: rtl; }
+[dir="rtl"] .note-header { direction: rtl; }
+[dir="rtl"] .milkdown .ProseMirror { direction: rtl; text-align: right; }
+[dir="rtl"] .chat-area { direction: rtl; }
+[dir="rtl"] .chat-input textarea { direction: rtl; }
+[dir="rtl"] .folder-file-list { direction: rtl; }
+[dir="rtl"] .note-card { direction: rtl; }
+[dir="rtl"] .tab-bar { direction: rtl; }
