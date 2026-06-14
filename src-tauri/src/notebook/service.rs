@@ -281,11 +281,6 @@ impl NotebookService {
     }
 }
 
-fn dedup_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
-    let mut seen = std::collections::HashSet::new();
-    results.into_iter().filter(|r| seen.insert(r.id.clone())).collect()
-}
-
 fn row_to_note(row: &rusqlite::Row) -> Note {
     Note {
         id: row.get("id").unwrap(),

@@ -47,7 +47,6 @@ struct OpenAiChoice { message: OpenAiResponseMessage }
 
 #[derive(serde::Deserialize)]
 struct OpenAiResponseMessage {
-    role: String,
     content: String,
     #[serde(default)]
     reasoning_content: Option<String>,
@@ -199,7 +198,7 @@ impl LlmProvider for OpenAiProvider {
     }
 
     async fn test_connection(&self) -> AppResult<bool> {
-        let resp = self.chat(
+        self.chat(
             vec![Message { role: "user".into(), content: "Say hello in one word.".into() }],
             ChatOptions { max_tokens: 64, ..Default::default() },
         ).await?;

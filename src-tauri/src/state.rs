@@ -24,8 +24,4 @@ impl AppState {
     pub fn notes_dir(&self) -> std::path::PathBuf {
         self.data_dir.join("notebooks").join("default").join("notes")
     }
-
-    pub fn attachments_dir(&self) -> std::path::PathBuf {
-        self.data_dir.join("notebooks").join("default").join("attachments")
-    }
 }

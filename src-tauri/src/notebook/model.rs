@@ -55,15 +55,3 @@ pub struct SearchResult {
     pub snippet: String,
     pub rank: f64,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateFolderRequest {
-    pub parent: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenameFolderRequest {
-    pub path: String,
-    pub new_name: String,
-}
