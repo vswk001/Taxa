@@ -30,8 +30,9 @@
       <label>{{ t('llmForm.model') }}</label>
       <input v-model="form.model_name" :placeholder="modelPlaceholder" />
     </div>
-    <div class="form-group">
-      <label><input type="checkbox" v-model="form.is_default" /> {{ t('llmForm.setDefault') }}</label>
+    <div class="checkbox-group">
+      <input id="is_default" type="checkbox" v-model="form.is_default" />
+      <label for="is_default">{{ t('llmForm.setDefault') }}</label>
     </div>
     <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
     <div class="form-actions">
@@ -154,6 +155,15 @@ function handleSave() {
   box-sizing: border-box;
 }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent-color); }
+.checkbox-group {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+.checkbox-group input {
+  width: auto; margin: 0; cursor: pointer; accent-color: var(--accent-color);
+}
+.checkbox-group label {
+  margin: 0; font-weight: 500; font-size: 13px; color: var(--text-primary); cursor: pointer;
+}
 .hint { font-size: 11px; color: var(--text-secondary); display: block; margin-top: 2px; }
 .form-actions { display: flex; gap: 8px; margin-top: 16px; }
 .btn-test { padding: 8px 16px; background: var(--bg-secondary); border-radius: var(--radius); font-size: 13px; border: 1px solid var(--border-color); cursor: pointer; color: var(--text-primary); }
