@@ -104,6 +104,8 @@ export default {
     optimizeApplied: 'تم تطبيق التحسين',
     noNoteForOptimize: 'افتح ملاحظة أولاً لاستخدام وضع التحسين',
     changesLabel: 'التغييرات: ',
+    fallbackNotice: '{failed} غير متاح، تم التبديل إلى {next}',
+    reorderHint: 'اسحب لإعادة ترتيب الاحتياطي (يُجرّب من الأعلى للأسفل)',
     applyOptimize: 'تطبيق التغييرات',
     originalContent: 'الأصلي',
     optimizedContent: 'المحسّن',

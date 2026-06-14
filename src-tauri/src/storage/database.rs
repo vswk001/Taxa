@@ -63,7 +63,8 @@ impl Database {
                 api_key_encrypted TEXT,
                 model_name TEXT NOT NULL,
                 is_default INTEGER DEFAULT 0,
-                enabled INTEGER DEFAULT 1
+                enabled INTEGER DEFAULT 1,
+                priority INTEGER DEFAULT 0
             );
 
             CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(title, content, tags);
@@ -73,6 +74,32 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_ai_ops_status ON ai_operations(status);"
         ).map_err(|e| AppError::Database(format!("Migration failed: {}", e)))?;
 
+        // Migration: add priority column to pre-existing llm_providers tables.
+        self.ensure_column("llm_providers", "priority", "INTEGER DEFAULT 0")?;
+
+        Ok(())
+    }
+
+    /// Adds a column to a table if it does not already exist (idempotent).
+    fn ensure_column(&self, table: &str, column: &str, decl: &str) -> AppResult<()> {
+        let pragma = format!("PRAGMA table_info({})", table);
+        let has_col = {
+            let mut stmt = self.conn.prepare(&pragma)
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(1))?;
+            let mut found = false;
+            for r in rows {
+                if r? == column {
+                    found = true;
+                }
+            }
+            found
+        };
+        if !has_col {
+            let sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, column, decl);
+            self.conn.execute(&sql, [])
+                .map_err(|e| AppError::Database(format!("Migration failed: {}", e)))?;
+        }
         Ok(())
     }
 

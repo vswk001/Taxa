@@ -40,6 +40,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadProviders();
   }
 
+  async function reorderProviders(orderedIds: string[]) {
+    await invoke('reorder_providers', { orderedIds });
+    await loadProviders();
+  }
+
   async function testProvider(form: LlmProviderForm) {
     return invoke<boolean>('ai_test_provider', {
       providerType: form.provider_type,
@@ -73,5 +78,5 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  return { providers, theme, loadProviders, saveProvider, deleteProvider, testProvider };
+  return { providers, theme, loadProviders, saveProvider, deleteProvider, reorderProviders, testProvider };
 });

@@ -104,6 +104,8 @@ export default {
     optimizeApplied: 'Optimization applied',
     noNoteForOptimize: 'Please open a note first',
     changesLabel: 'Changes: ',
+    fallbackNotice: '{failed} unavailable, switched to {next}',
+    reorderHint: 'Drag to reorder fallback order (tried top to bottom)',
     applyOptimize: 'Apply Changes',
     originalContent: 'Original',
     optimizedContent: 'Optimized',

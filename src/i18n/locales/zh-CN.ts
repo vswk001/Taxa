@@ -104,6 +104,8 @@ export default {
     optimizeApplied: '已应用优化',
     noNoteForOptimize: '请先打开一个笔记再使用优化模式',
     changesLabel: '变更说明：',
+    fallbackNotice: '{failed} 不可用，已切换到 {next}',
+    reorderHint: '拖拽调整备用顺序（从上到下依次尝试）',
     applyOptimize: '应用修改',
     originalContent: '原文',
     optimizedContent: '优化后',

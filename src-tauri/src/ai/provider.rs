@@ -50,6 +50,18 @@ pub struct ProviderConfig {
     pub model_name: String,
     pub is_default: bool,
     pub enabled: bool,
+    /// Fallback order: lower is tried first. Set via drag-and-drop reordering.
+    #[serde(default)]
+    pub priority: i32,
+}
+
+/// Payload for a provider-fallback notification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallbackInfo {
+    /// Name of the provider that just failed.
+    pub failed: String,
+    /// Name of the next provider being tried.
+    pub next: String,
 }
 
 /// Events emitted during streaming LLM responses.
@@ -60,6 +72,8 @@ pub enum StreamEvent {
     Reasoning(String),
     /// Content token delta
     Content(String),
+    /// A provider failed and the engine is falling back to the next one.
+    Fallback(FallbackInfo),
 }
 
 pub type StreamCallback = Arc<dyn Fn(StreamEvent) + Send + Sync>;

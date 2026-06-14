@@ -33,4 +33,6 @@ export interface ChatMessage {
   status?: 'pending' | 'done' | 'error';
   reasoning?: string;
   attachments?: FileAttachment[];
+  /** Set when the engine fell back to another provider (failed -> next). */
+  fallbackInfo?: { failed: string; next: string };
 }

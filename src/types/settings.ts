@@ -9,6 +9,7 @@ export interface LlmProvider {
   model_name: string;
   is_default: boolean;
   enabled: boolean;
+  priority: number;
 }
 
 export interface LlmProviderForm {

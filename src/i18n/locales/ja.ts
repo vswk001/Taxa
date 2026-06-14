@@ -104,6 +104,8 @@ export default {
     optimizeApplied: '最適化を適用しました',
     noNoteForOptimize: '最適化モードを使用するにはノートを開いてください',
     changesLabel: '変更内容：',
+    fallbackNotice: '{failed} が利用不可、{next} に切り替えました',
+    reorderHint: 'ドラッグで予備順序を変更（上から下へ試行）',
     applyOptimize: '変更を適用',
     originalContent: '原文',
     optimizedContent: '最適化後',

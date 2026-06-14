@@ -75,7 +75,7 @@ export const useAiStore = defineStore('ai', () => {
       streamUnlisten();
       streamUnlisten = null;
     }
-    streamUnlisten = await listen<{ seq: number; event: { type: string; text: string } }>('ai-stream', (evt) => {
+    streamUnlisten = await listen<{ seq: number; event: { type: string; text: any } }>('ai-stream', (evt) => {
       if (evt.payload.seq !== seq) return;
       const msg = getMsg();
       if (!msg) return;
@@ -88,6 +88,8 @@ export const useAiStore = defineStore('ai', () => {
         if (msg.content === '正在分析...') {
           msg.content = '正在思考...';
         }
+      } else if (type === 'Fallback') {
+        msg.fallbackInfo = { failed: text.failed, next: text.next };
       }
     });
 
@@ -221,7 +223,7 @@ export const useAiStore = defineStore('ai', () => {
     const getMsg = () => messages.value.find(m => m.id === aiMsgId);
 
     if (streamUnlisten) { streamUnlisten(); streamUnlisten = null; }
-    streamUnlisten = await listen<{ seq: number; event: { type: string; text: string } }>('ai-stream', (evt) => {
+    streamUnlisten = await listen<{ seq: number; event: { type: string; text: any } }>('ai-stream', (evt) => {
       if (evt.payload.seq !== seq) return;
       const msg = getMsg();
       if (!msg) return;
@@ -230,6 +232,8 @@ export const useAiStore = defineStore('ai', () => {
         if (!msg.reasoning) msg.reasoning = '';
         msg.reasoning += text;
         if (msg.content === '正在优化...') msg.content = '正在思考...';
+      } else if (type === 'Fallback') {
+        msg.fallbackInfo = { failed: text.failed, next: text.next };
       }
     });
 

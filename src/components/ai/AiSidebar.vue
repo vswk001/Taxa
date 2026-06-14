@@ -16,9 +16,21 @@
         <p>{{ t('ai.noProviders') }}</p>
         <p class="hint">{{ t('ai.noProvidersHint') }}</p>
       </div>
+      <div v-if="!showForm && settingsStore.providers.length > 1" class="reorder-hint">{{ t('ai.reorderHint') }}</div>
       <div v-if="!showForm" class="provider-list">
-        <div v-for="p in settingsStore.providers" :key="p.id" class="provider-item">
+        <div
+          v-for="(p, index) in settingsStore.providers"
+          :key="p.id"
+          class="provider-item draggable"
+          :class="{ dragover: overIndex === index, dragging: dragIndex === index }"
+          draggable="true"
+          @dragstart="onDragStart(index)"
+          @dragover="onDragOver($event, index)"
+          @drop="onDrop(index)"
+          @dragend="onDragEnd"
+        >
           <div class="provider-info">
+            <span class="drag-handle" :title="t('ai.reorderHint')">⋮⋮</span>
             <span class="provider-name">{{ p.name }}</span>
             <span class="provider-model">{{ p.model_name }}</span>
             <span v-if="p.is_default" class="provider-default">{{ t('common.default') }}</span>
@@ -63,12 +75,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useAiStore } from '@/stores/ai';
 import { useNotebookStore } from '@/stores/notebook';
 import { useSettingsStore } from '@/stores/settings';
 import { invoke } from '@tauri-apps/api/core';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { useProviderDrag } from '@/composables/useProviderDrag';
 import ChatArea from './ChatArea.vue';
 import ChatInput from './ChatInput.vue';
 import LlmProviderForm from '@/components/settings/LlmProviderForm.vue';
@@ -78,6 +92,9 @@ const { t } = useI18n();
 const aiStore = useAiStore();
 const notebookStore = useNotebookStore();
 const settingsStore = useSettingsStore();
+const { providers: providersRef } = storeToRefs(settingsStore);
+const { dragIndex, overIndex, onDragStart, onDragOver, onDrop, onDragEnd } =
+  useProviderDrag(providersRef, (ids) => settingsStore.reorderProviders(ids));
 const showConfig = ref(false);
 const showForm = ref(false);
 const editingProvider = ref<any>(null);
@@ -200,6 +217,14 @@ async function setDefault(id: string) {
   padding: 8px 10px; border: 1px solid var(--border-color);
   border-radius: 6px; margin-bottom: 6px;
 }
+.provider-item.dragover { border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
+.provider-item.dragging { opacity: 0.5; }
+.drag-handle {
+  cursor: grab; color: var(--text-secondary); opacity: 0.5;
+  font-size: 13px; line-height: 1; letter-spacing: -2px; user-select: none;
+}
+.drag-handle:hover { opacity: 1; }
+.reorder-hint { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; opacity: 0.8; }
 .provider-info { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
 .provider-name { font-weight: 600; font-size: 13px; }
 .provider-model { font-size: 11px; color: var(--text-secondary); }

@@ -14,6 +14,9 @@
           <div class="thinking-content">{{ msg.reasoning }}</div>
         </div>
       </div>
+      <div v-if="msg.fallbackInfo" class="fallback-note">
+        {{ t('ai.fallbackNotice', { failed: msg.fallbackInfo.failed, next: msg.fallbackInfo.next }) }}
+      </div>
       <div class="message-content">{{ msg.content }}</div>
       <div v-if="msg.attachments?.length" class="msg-attachments">
         <span v-for="a in msg.attachments" :key="a.name" class="msg-file-chip">📎 {{ a.name }}</span>
@@ -78,6 +81,11 @@ function handleConfirm(original: AiSuggestion, modified: AiSuggestion) {
   background: rgba(255,255,255,0.15);
 }
 .message:not(.user) .msg-file-chip { background: var(--bg-secondary); }
+.fallback-note {
+  font-size: 11px; padding: 3px 8px; margin-bottom: 6px;
+  border-radius: 4px; color: #b8860b;
+  background: rgba(184,134,11,0.1); border: 1px solid rgba(184,134,11,0.25);
+}
 
 /* Thinking card */
 .thinking-card {

@@ -8,7 +8,8 @@ use rusqlite::params;
 #[tauri::command]
 pub async fn list_providers(state: State<'_, AppState>) -> AppResult<Vec<ProviderConfig>> {
     let engine = state.ai_engine.read().await;
-    Ok(engine.providers.values().cloned().collect())
+    // Return in fallback order so the UI lists them top-to-bottom as tried.
+    Ok(engine.get_providers_in_order())
 }
 
 #[tauri::command]
@@ -27,16 +28,26 @@ pub async fn save_provider(state: State<'_, AppState>, config: ProviderConfig) -
         config
     };
 
+    // Resolve priority: keep the existing provider's priority, or append a new
+    // one after the highest current priority.
+    let priority = {
+        let engine = state.ai_engine.read().await;
+        match engine.providers.get(&final_config.id) {
+            Some(existing) => existing.priority,
+            None => engine.providers.values().map(|p| p.priority).max().unwrap_or(-1) + 1,
+        }
+    };
+
     // Save provider + API key to database
     {
         let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
         db.conn().execute(
-            "INSERT OR REPLACE INTO llm_providers (id, name, provider_type, api_url, api_key_encrypted, model_name, is_default, enabled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT OR REPLACE INTO llm_providers (id, name, provider_type, api_url, api_key_encrypted, model_name, is_default, enabled, priority)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 final_config.id, final_config.name, final_config.provider_type,
                 final_config.api_url, final_config.api_key, final_config.model_name,
-                final_config.is_default, final_config.enabled,
+                final_config.is_default, final_config.enabled, priority,
             ],
         )?;
     }
@@ -51,6 +62,25 @@ pub async fn save_provider(state: State<'_, AppState>, config: ProviderConfig) -
     }
 
     // Reload providers into engine
+    let mut engine = state.ai_engine.write().await;
+    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
+    engine.load_providers(&db)?;
+    Ok(())
+}
+
+/// Rewrites fallback priorities to match the given id order (first = tried first).
+#[tauri::command]
+pub async fn reorder_providers(state: State<'_, AppState>, ordered_ids: Vec<String>) -> AppResult<()> {
+    {
+        let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
+        for (idx, id) in ordered_ids.iter().enumerate() {
+            db.conn().execute(
+                "UPDATE llm_providers SET priority = ?1 WHERE id = ?2",
+                params![idx as i32, id],
+            )?;
+        }
+    }
+
     let mut engine = state.ai_engine.write().await;
     let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
     engine.load_providers(&db)?;

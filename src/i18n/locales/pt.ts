@@ -104,6 +104,8 @@ export default {
     optimizeApplied: 'Otimização aplicada',
     noNoteForOptimize: 'Abra uma nota primeiro para usar o modo de otimização',
     changesLabel: 'Alterações: ',
+    fallbackNotice: '{failed} indisponível, alternado para {next}',
+    reorderHint: 'Arraste para reordenar (testados de cima para baixo)',
     applyOptimize: 'Aplicar alterações',
     originalContent: 'Original',
     optimizedContent: 'Otimizado',

@@ -58,6 +58,7 @@ pub fn run() {
             commands::settings::list_providers,
             commands::settings::save_provider,
             commands::settings::delete_provider,
+            commands::settings::reorder_providers,
             commands::graph::get_graph_data,
         ])
         .run(tauri::generate_context!())

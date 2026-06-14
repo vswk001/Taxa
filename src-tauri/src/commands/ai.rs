@@ -177,7 +177,7 @@ pub async fn ai_test_provider(
     let config = crate::ai::provider::ProviderConfig {
         id: "_test".into(), name: "test".into(), provider_type,
         api_url, api_key, model_name,
-        is_default: false, enabled: true,
+        is_default: false, enabled: true, priority: 0,
     };
     let provider = crate::ai::provider::create_provider(&config)?;
     provider.test_connection().await
