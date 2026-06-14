@@ -12,11 +12,11 @@
 
     <!-- LLM Config Panel -->
     <div v-if="showConfig" class="config-panel">
-      <div v-if="settingsStore.providers.length === 0" class="no-providers">
+      <div v-if="settingsStore.providers.length === 0 && !showForm" class="no-providers">
         <p>{{ t('ai.noProviders') }}</p>
         <p class="hint">{{ t('ai.noProvidersHint') }}</p>
       </div>
-      <div class="provider-list">
+      <div v-if="!showForm" class="provider-list">
         <div v-for="p in settingsStore.providers" :key="p.id" class="provider-item">
           <div class="provider-info">
             <span class="provider-name">{{ p.name }}</span>
