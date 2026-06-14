@@ -36,13 +36,28 @@
 
     <!-- Chat Area -->
     <template v-else>
-      <ChatArea :messages="aiStore.messages" @apply="aiStore.applyResult($event)" @dismiss="aiStore.dismiss()" />
+      <ChatArea :messages="aiStore.messages" @apply="aiStore.applyResult($event)" @apply-optimize="onApplyOptimize" @dismiss="aiStore.dismiss()" />
       <div v-if="aiStore.isProcessing" class="processing-bar">
         <span class="processing-text">{{ t('ai.processing') }}</span>
         <button class="cancel-btn" @click="aiStore.cancel()">{{ t('ai.cancel') }}</button>
       </div>
-      <ChatInput :disabled="aiStore.isProcessing" @submit="(c: string, a: any) => aiStore.submitInput(c, a)" />
+      <div class="input-area">
+        <div class="mode-select-wrap">
+          <select v-model="aiStore.mode" class="mode-select">
+            <option value="organize">{{ t('ai.modeOrganize') }} — {{ t('ai.modeOrganizeDesc') }}</option>
+            <option value="optimize">{{ t('ai.modeOptimize') }} — {{ t('ai.modeOptimizeDesc') }}</option>
+          </select>
+        </div>
+        <ChatInput :disabled="aiStore.isProcessing" :mode="aiStore.mode" @submit="handleSubmit" />
+      </div>
     </template>
+    <ConfirmDialog
+      :visible="confirmVisible"
+      :message="confirmMsg"
+      kind="danger"
+      @confirm="confirmResolve?.(true); confirmVisible = false"
+      @cancel="confirmResolve?.(false); confirmVisible = false"
+    />
   </div>
 </template>
 
@@ -50,19 +65,56 @@
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAiStore } from '@/stores/ai';
+import { useNotebookStore } from '@/stores/notebook';
 import { useSettingsStore } from '@/stores/settings';
 import { invoke } from '@tauri-apps/api/core';
-import { confirm as tauriConfirm, message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import ChatArea from './ChatArea.vue';
 import ChatInput from './ChatInput.vue';
 import LlmProviderForm from '@/components/settings/LlmProviderForm.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const { t } = useI18n();
 const aiStore = useAiStore();
+const notebookStore = useNotebookStore();
 const settingsStore = useSettingsStore();
 const showConfig = ref(false);
 const showForm = ref(false);
 const editingProvider = ref<any>(null);
+const confirmVisible = ref(false);
+const confirmMsg = ref('');
+const confirmResolve = ref<((v: boolean) => void) | null>(null);
+
+function showConfirm(msg: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    confirmMsg.value = msg;
+    confirmVisible.value = true;
+    confirmResolve.value = resolve;
+  });
+}
+
+function handleSubmit(content: string, attachments: any[]) {
+  if (aiStore.mode === 'optimize') {
+    const note = notebookStore.currentNote;
+    if (!note) {
+      aiStore.messages.push({
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: t('ai.noNoteForOptimize'),
+        timestamp: new Date().toISOString(),
+        status: 'error',
+      });
+      return;
+    }
+    aiStore.optimizeNote(note.note.id, content);
+  } else {
+    aiStore.submitInput(content, attachments);
+  }
+}
+
+function onApplyOptimize(noteId: string, title: string, content: string) {
+  aiStore.applyOptimize(noteId, title, content);
+}
 
 onMounted(() => { settingsStore.loadProviders(); });
 
@@ -87,7 +139,7 @@ function handleEdit(p: any) {
 }
 
 async function handleDelete(id: string) {
-  const yes = await tauriConfirm(t('ai.deleteProviderConfirm'), { title: t('ai.deleteConfirmTitle'), kind: 'warning' });
+  const yes = await showConfirm(t('ai.deleteProviderConfirm'));
   if (yes) {
     try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
   }
@@ -181,4 +233,14 @@ async function setDefault(id: string) {
   color: white; border: none; border-radius: 4px; cursor: pointer;
 }
 .cancel-btn:hover { opacity: 0.9; }
+
+.input-area { border-top: 1px solid var(--border-color); }
+.mode-select-wrap { padding: 6px 12px 0; }
+.mode-select {
+  width: 100%; padding: 5px 8px; font-size: 12px;
+  border: 1px solid var(--border-color); border-radius: 6px;
+  background: var(--bg-primary); color: var(--text-primary);
+  outline: none; cursor: pointer;
+}
+.mode-select:focus { border-color: var(--accent-color); }
 </style>

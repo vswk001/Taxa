@@ -52,6 +52,7 @@ pub fn run() {
             commands::notebook::export_folder,
             commands::ai::ai_process_input,
             commands::ai::ai_apply_result,
+            commands::ai::ai_optimize_note,
             commands::ai::ai_enrich_note,
             commands::ai::ai_test_provider,
             commands::settings::list_providers,

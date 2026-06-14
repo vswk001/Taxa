@@ -1,6 +1,6 @@
 // src-tauri/src/ai/engine.rs
 use crate::ai::provider::{ProviderConfig, StreamCallback};
-use crate::ai::organizer::{AiOrganizer, OrganizeResult, EnrichResult};
+use crate::ai::organizer::{AiOrganizer, OrganizeResult, EnrichResult, OptimizeResult};
 use crate::error::AppResult;
 use crate::storage::database::Database;
 use std::collections::HashMap;
@@ -54,20 +54,6 @@ impl AiEngine {
             .or_else(|| self.providers.values().find(|p| p.enabled))
     }
 
-    pub async fn process_input(
-        &self,
-        content: &str,
-        folder_structure: &str,
-        related_notes: &str,
-    ) -> AppResult<OrganizeResult> {
-        let config = self.get_default_provider()
-            .ok_or_else(|| crate::error::AppError::AiEngine(
-                "No LLM provider configured. Please add a provider in Settings.".into()
-            ))?;
-
-        AiOrganizer::process_user_input(config, content, folder_structure, related_notes).await
-    }
-
     pub async fn process_input_stream(
         &self,
         content: &str,
@@ -91,5 +77,21 @@ impl AiEngine {
             ))?;
 
         AiOrganizer::enrich_note(config, title, content).await
+    }
+
+    pub async fn optimize_note(
+        &self,
+        title: &str,
+        content: &str,
+        instruction: &str,
+        on_event: Option<StreamCallback>,
+    ) -> AppResult<OptimizeResult> {
+        let config = self.get_default_provider()
+            .ok_or_else(|| crate::error::AppError::AiEngine(
+                "No LLM provider configured. Please add a provider in Settings.".into()
+            ))?
+            .clone();
+
+        AiOrganizer::optimize_note(&config, title, content, instruction, on_event).await
     }
 }

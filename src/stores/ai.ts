@@ -1,7 +1,7 @@
 // src/stores/ai.ts
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { ChatMessage } from '@/types/ai';
+import type { ChatMessage, FileAttachment } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -33,10 +33,11 @@ export const useAiStore = defineStore('ai', () => {
   const messages = ref<ChatMessage[]>([]);
   const isProcessing = ref(false);
   const lastResult = ref<OrganizeResult | null>(null);
+  const mode = ref<'organize' | 'optimize'>('organize');
   let requestSeq = 0;
   let streamUnlisten: UnlistenFn | null = null;
 
-  async function submitInput(content: string) {
+  async function submitInput(content: string, attachments?: FileAttachment[]) {
     const seq = ++requestSeq;
 
     const userMsg: ChatMessage = {
@@ -45,8 +46,16 @@ export const useAiStore = defineStore('ai', () => {
       content,
       timestamp: new Date().toISOString(),
       status: 'done',
+      attachments: attachments?.length ? attachments : undefined,
     };
     messages.value.push(userMsg);
+
+    // Prepend file contents to the AI input
+    let fullContent = content;
+    if (attachments?.length) {
+      const fileParts = attachments.map(a => `--- 文件: ${a.name} ---\n${a.content}`).join('\n\n');
+      fullContent = fileParts + '\n\n' + content;
+    }
 
     const aiMsgId = crypto.randomUUID();
     messages.value.push({
@@ -85,7 +94,7 @@ export const useAiStore = defineStore('ai', () => {
     try {
       console.log('[AI] submitInput: calling invoke, seq=', seq);
       const result = await withTimeout(
-        invoke<OrganizeResult>('ai_process_input', { content, seq }),
+        invoke<OrganizeResult>('ai_process_input', { content: fullContent, seq }),
         120_000,
       );
       console.log('[AI] submitInput: invoke returned', result);
@@ -183,6 +192,113 @@ export const useAiStore = defineStore('ai', () => {
 
   function dismiss() {
     lastResult.value = null;
+    const last = messages.value[messages.value.length - 1];
+    if (last) last.suggestions = [];
+  }
+
+  async function optimizeNote(noteId: string, instruction: string) {
+    const seq = ++requestSeq;
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: instruction,
+      timestamp: new Date().toISOString(),
+      status: 'done',
+    };
+    messages.value.push(userMsg);
+
+    const aiMsgId = crypto.randomUUID();
+    messages.value.push({
+      id: aiMsgId,
+      role: 'assistant',
+      content: '正在优化...',
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+    });
+    isProcessing.value = true;
+
+    const getMsg = () => messages.value.find(m => m.id === aiMsgId);
+
+    if (streamUnlisten) { streamUnlisten(); streamUnlisten = null; }
+    streamUnlisten = await listen<{ seq: number; event: { type: string; text: string } }>('ai-stream', (evt) => {
+      if (evt.payload.seq !== seq) return;
+      const msg = getMsg();
+      if (!msg) return;
+      const { type, text } = evt.payload.event;
+      if (type === 'Reasoning') {
+        if (!msg.reasoning) msg.reasoning = '';
+        msg.reasoning += text;
+        if (msg.content === '正在优化...') msg.content = '正在思考...';
+      }
+    });
+
+    try {
+      const result = await withTimeout(
+        invoke<{ title: string; content: string; summary: string }>('ai_optimize_note', { noteId, instruction, seq }),
+        120_000,
+      );
+
+      if (seq !== requestSeq) return;
+
+      const msg = getMsg();
+      if (msg) {
+        msg.content = result.summary || '优化完成';
+        msg.reasoning = undefined;
+        msg.status = 'done';
+        // Store optimize result as a special suggestion
+        msg.suggestions = [{
+          action: 'optimize' as any,
+          title: result.title,
+          content: result.content,
+          target_note_id: noteId,
+          confidence: 0.9,
+        }];
+      }
+    } catch (e: unknown) {
+      if (seq !== requestSeq) return;
+      const errMsg = extractError(e);
+      const msg = getMsg();
+      if (msg) {
+        msg.content = `优化失败: ${errMsg}`;
+        msg.status = 'error';
+      }
+    } finally {
+      if (streamUnlisten) { streamUnlisten(); streamUnlisten = null; }
+      if (seq === requestSeq) isProcessing.value = false;
+    }
+  }
+
+  async function applyOptimize(noteId: string, title: string, content: string) {
+    const assistantMsg = messages.value.find(m => m.suggestions?.length);
+    if (assistantMsg) assistantMsg.suggestions = undefined;
+
+    try {
+      const notebookStore = useNotebookStore();
+      await notebookStore.updateNoteContent(noteId, content);
+      if (title) {
+        await notebookStore.updateNoteContent(noteId, content, title);
+      }
+      await notebookStore.loadFolderTree();
+      await notebookStore.loadAllNotes();
+
+      messages.value.push({
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: `已应用优化`,
+        timestamp: new Date().toISOString(),
+        status: 'done',
+      });
+    } catch (e: unknown) {
+      const errMsg = extractError(e);
+      messages.value.push({
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: `应用失败: ${errMsg}`,
+        timestamp: new Date().toISOString(),
+        status: 'error',
+      });
+    }
   }
 
   function clearMessages() {
@@ -190,5 +306,5 @@ export const useAiStore = defineStore('ai', () => {
     lastResult.value = null;
   }
 
-  return { messages, isProcessing, lastResult, submitInput, cancel, applyResult, dismiss, clearMessages };
+  return { messages, isProcessing, lastResult, mode, submitInput, cancel, applyResult, dismiss, optimizeNote, applyOptimize, clearMessages };
 });

@@ -21,7 +21,7 @@
       <OperationCard
         v-if="msg.suggestions?.length"
         :suggestion="msg.suggestions[0]"
-        @confirm="emit('apply', toResult(msg.suggestions[0]))"
+        @confirm="handleConfirm(msg.suggestions[0], $event)"
         @dismiss="emit('dismiss')"
       />
     </div>
@@ -38,7 +38,7 @@ import OperationCard from './OperationCard.vue';
 const { t } = useI18n();
 
 defineProps<{ messages: ChatMessage[] }>();
-const emit = defineEmits<{ apply: [result: OrganizeResult]; dismiss: [] }>();
+const emit = defineEmits<{ apply: [result: OrganizeResult]; applyOptimize: [noteId: string, title: string, content: string]; dismiss: [] }>();
 const expandedMap = reactive<Record<string, boolean>>({});
 
 function preview(text: string) {
@@ -52,6 +52,15 @@ function toResult(s: AiSuggestion): OrganizeResult {
     tags: s.tags || [], content: s.content || '',
     target_note_id: s.target_note_id || null, complexity: 'complex',
   };
+}
+
+function handleConfirm(original: AiSuggestion, modified: AiSuggestion) {
+  if (modified.action === 'optimize') {
+    const noteId = original.target_note_id || modified.target_note_id || '';
+    emit('applyOptimize', noteId, modified.title || '', modified.content || '');
+  } else {
+    emit('apply', toResult(modified));
+  }
 }
 </script>
 

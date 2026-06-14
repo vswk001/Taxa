@@ -22,6 +22,13 @@ pub struct OrganizeResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizeResult {
+    pub title: String,
+    pub content: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichResult {
     pub title: String,
     pub content: String,
@@ -65,15 +72,6 @@ fn extract_json(text: &str) -> &str {
 pub struct AiOrganizer;
 
 impl AiOrganizer {
-    pub async fn process_user_input(
-        config: &ProviderConfig,
-        content: &str,
-        folder_structure: &str,
-        related_notes: &str,
-    ) -> AppResult<OrganizeResult> {
-        Self::process_user_input_stream(config, content, folder_structure, related_notes, None).await
-    }
-
     pub async fn process_user_input_stream(
         config: &ProviderConfig,
         content: &str,
@@ -86,9 +84,14 @@ impl AiOrganizer {
         let messages = PromptTemplates::categorize(content, folder_structure, related_notes);
         eprintln!("[AI] Sending chat request with {} messages", messages.len());
 
+        let options = ChatOptions {
+            max_tokens: 8192,
+            ..ChatOptions::default()
+        };
+
         let response = match on_event {
-            Some(cb) => provider.chat_stream(messages, ChatOptions::default(), cb).await?,
-            None => provider.chat(messages, ChatOptions::default()).await?,
+            Some(cb) => provider.chat_stream(messages, options, cb).await?,
+            None => provider.chat(messages, options).await?,
         };
         eprintln!("[AI] Response received, content length: {}", response.content.len());
 
@@ -111,6 +114,30 @@ impl AiOrganizer {
         let provider = create_provider(config)?;
         let messages = PromptTemplates::enrich(title, content);
         let response = provider.chat(messages, ChatOptions::default()).await?;
+
+        let json_str = extract_json(&response.content);
+        serde_json::from_str(json_str).map_err(|e| {
+            crate::error::AppError::AiEngine(format!(
+                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
+            ))
+        })
+    }
+
+    pub async fn optimize_note(
+        config: &ProviderConfig,
+        title: &str,
+        content: &str,
+        instruction: &str,
+        on_event: Option<StreamCallback>,
+    ) -> AppResult<OptimizeResult> {
+        let provider = create_provider(config)?;
+        let messages = PromptTemplates::optimize(title, content, instruction);
+        let options = ChatOptions { max_tokens: 8192, ..ChatOptions::default() };
+
+        let response = match on_event {
+            Some(cb) => provider.chat_stream(messages, options, cb).await?,
+            None => provider.chat(messages, options).await?,
+        };
 
         let json_str = extract_json(&response.content);
         serde_json::from_str(json_str).map_err(|e| {

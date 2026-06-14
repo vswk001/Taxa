@@ -10,13 +10,18 @@ export interface AiOperation {
 }
 
 export interface AiSuggestion {
-  action: 'create' | 'append' | 'rename' | 'tag';
+  action: 'create' | 'append' | 'rename' | 'tag' | 'optimize';
   title?: string;
   folder?: string;
   tags?: string[];
   content?: string;
   target_note_id?: string;
   confidence: number;
+}
+
+export interface FileAttachment {
+  name: string;
+  content: string;
 }
 
 export interface ChatMessage {
@@ -27,4 +32,5 @@ export interface ChatMessage {
   suggestions?: AiSuggestion[];
   status?: 'pending' | 'done' | 'error';
   reasoning?: string;
+  attachments?: FileAttachment[];
 }

@@ -1,6 +1,7 @@
 // src-tauri/src/commands/ai.rs
 use crate::ai::provider::StreamEvent;
 use crate::ai::organizer::OrganizeResult;
+use crate::ai::organizer::OptimizeResult;
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::storage::markdown::MarkdownStorage;
@@ -123,6 +124,32 @@ pub async fn ai_apply_result(state: State<'_, AppState>, result: OrganizeResult)
 
     eprintln!("[AI] apply_result OK: note_id={}", note.id);
     Ok(note)
+}
+
+#[tauri::command]
+pub async fn ai_optimize_note(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    note_id: String,
+    instruction: String,
+    seq: u32,
+) -> AppResult<OptimizeResult> {
+    let (title, content) = {
+        let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        let (note, content) = crate::notebook::service::NotebookService::get_note(&db, &md, &note_id)?;
+        (note.title, content)
+    };
+
+    let engine = state.ai_engine.read().await;
+
+    let app_handle = app.clone();
+    let on_event = Arc::new(move |event: StreamEvent| {
+        let payload = serde_json::json!({ "seq": seq, "event": event });
+        let _ = app_handle.emit("ai-stream", payload);
+    });
+
+    engine.optimize_note(&title, &content, &instruction, Some(on_event)).await
 }
 
 #[tauri::command]

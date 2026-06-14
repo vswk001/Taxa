@@ -4,7 +4,13 @@ use crate::ai::provider::Message;
 pub struct PromptTemplates;
 
 impl PromptTemplates {
-    pub fn categorize(content: &str, folder_structure: &str, related_notes: &str) -> Vec<Message> {
+    pub fn categorize(raw_content: &str, folder_structure: &str, related_notes: &str) -> Vec<Message> {
+        // Sanitize: remove null bytes, limit content length
+        let content: String = raw_content
+            .replace('\0', "")
+            .chars()
+            .take(80000)
+            .collect();
         vec![
             Message {
                 role: "system".into(),
@@ -62,15 +68,34 @@ impl PromptTemplates {
         ]
     }
 
-    pub fn rename(title: &str, content: &str) -> Vec<Message> {
+    pub fn optimize(title: &str, content: &str, instruction: &str) -> Vec<Message> {
+        let content_clean: String = content.replace('\0', "").chars().take(80000).collect();
+        let instruction_clean = if instruction.trim().is_empty() {
+            "请全面优化这篇笔记".to_string()
+        } else {
+            instruction.to_string()
+        };
         vec![
             Message {
                 role: "system".into(),
-                content: "根据笔记内容，建议一个简洁准确的标题。只返回标题文本，不要其他内容。".into(),
+                content: "你是一个笔记优化助手。用户会给你一篇已有笔记的标题和内容，以及优化指令。\n\
+                你需要根据指令对笔记内容进行修改优化，保持笔记的核心信息不变。\n\n\
+                返回纯JSON（不要markdown代码块）：\n\
+                {\"title\": \"优化后的标题\", \"content\": \"优化后的完整内容\", \
+                \"summary\": \"变更说明（简述做了哪些修改）\"}\n\n\
+                要求：\n\
+                - title: 如果优化指令未涉及标题，保持原标题不变\n\
+                - content: 返回完整的优化后内容（不是增量）\n\
+                - summary: 简述你做了哪些修改（一句话）\n\
+                - 保持原有的markdown格式\n\
+                - 不要添加原文中没有的信息，除非指令明确要求".into(),
             },
             Message {
                 role: "user".into(),
-                content: format!("当前标题：{}\n\n内容摘要：\n{}", title, &content[..content.len().min(500)]),
+                content: format!(
+                    "标题：{}\n\n优化指令：{}\n\n笔记内容：\n{}",
+                    title, instruction_clean, content_clean
+                ),
             },
         ]
     }

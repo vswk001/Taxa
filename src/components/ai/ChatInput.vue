@@ -11,14 +11,14 @@
     <div class="chat-input">
       <textarea
         v-model="text"
-        :placeholder="t('ai.inputPlaceholder')"
+        :placeholder="props.mode === 'optimize' ? t('ai.optimizePlaceholder') : t('ai.inputPlaceholder')"
         :disabled="disabled"
         @keydown.enter.exact.prevent="submit"
         @drop.prevent="handleDrop"
         @paste="handlePaste"
       />
       <div class="input-actions">
-        <button class="attach-btn" :disabled="disabled" @click="pickFile" :title="t('ai.uploadFile')">
+        <button v-if="props.mode !== 'optimize'" class="attach-btn" :disabled="disabled" @click="pickFile" :title="t('ai.uploadFile')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
         </button>
         <button class="send-btn" :disabled="disabled || (!text.trim() && !attachments.length)" @click="submit">
@@ -39,7 +39,7 @@ import type { FileAttachment } from '@/types/ai';
 const { t } = useI18n();
 const MAX_FILE_CHARS = 50000;
 
-defineProps<{ disabled: boolean }>();
+const props = defineProps<{ disabled: boolean; mode: 'organize' | 'optimize' }>();
 const emit = defineEmits<{ submit: [content: string, attachments: FileAttachment[]] }>();
 const text = ref('');
 const attachments = ref<FileAttachment[]>([]);
