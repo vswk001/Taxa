@@ -35,6 +35,7 @@
       <label for="is_default">{{ t('llmForm.setDefault') }}</label>
     </div>
     <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
+    <div v-if="successMsg" class="success-msg">{{ successMsg }}</div>
     <div class="form-actions">
       <button class="btn-test" @click="testConnection" :disabled="testing">
         {{ testing ? t('llmForm.testing') : t('llmForm.testConnection') }}
@@ -58,6 +59,7 @@ const emit = defineEmits<{ save: [form: LlmProviderForm & { id?: string }]; canc
 const settingsStore = useSettingsStore();
 const testing = ref(false);
 const errorMsg = ref('');
+const successMsg = ref('');
 
 const form = ref<LlmProviderForm>({
   name: props.initialData?.name || '',
@@ -115,12 +117,11 @@ function updateDefaults() {
 async function testConnection() {
   testing.value = true;
   errorMsg.value = '';
+  successMsg.value = '';
   try {
     const ok = await settingsStore.testProvider(form.value);
     if (ok) {
-      errorMsg.value = '';
-      // Show success briefly
-      testing.value = false;
+      successMsg.value = t('llmForm.connectionSuccess');
     } else {
       errorMsg.value = t('llmForm.connectionFailed');
     }
@@ -171,4 +172,5 @@ function handleSave() {
 .btn-save { padding: 8px 16px; background: var(--accent-color); color: white; border-radius: var(--radius); font-size: 13px; border: none; cursor: pointer; }
 .btn-cancel { padding: 8px 16px; font-size: 13px; background: none; border: 1px solid var(--border-color); border-radius: var(--radius); cursor: pointer; color: var(--text-primary); }
 .error-msg { color: var(--danger-color, red); font-size: 12px; margin-bottom: 8px; padding: 6px 10px; background: rgba(255,0,0,0.05); border-radius: 4px; }
+.success-msg { color: #2e7d32; font-size: 12px; margin-bottom: 8px; padding: 6px 10px; background: rgba(46,125,50,0.08); border-radius: 4px; }
 </style>

@@ -139,6 +139,7 @@ export default {
     nameRequired: '请输入名称',
     apiKeyRequired: '请输入 API Key',
     connectionFailed: '连接失败：未收到有效响应',
+    connectionSuccess: '连接成功',
     connectionFailedPrefix: '连接失败: ',
     typeClaude: 'Claude (Anthropic)',
     typeOpenai: 'OpenAI',

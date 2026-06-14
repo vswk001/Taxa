@@ -139,6 +139,7 @@ export default {
     nameRequired: 'يرجى إدخال الاسم',
     apiKeyRequired: 'يرجى إدخال مفتاح API',
     connectionFailed: 'فشل الاتصال: لم يتم استلام استجابة صالحة',
+    connectionSuccess: 'تم الاتصال بنجاح',
     connectionFailedPrefix: 'فشل الاتصال: ',
     typeClaude: 'Claude (Anthropic)',
     typeOpenai: 'OpenAI',

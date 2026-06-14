@@ -139,6 +139,7 @@ export default {
     nameRequired: 'Por favor, insira um nome',
     apiKeyRequired: 'Por favor, insira uma chave API',
     connectionFailed: 'Falha na conexão: sem resposta válida',
+    connectionSuccess: 'Conexão bem-sucedida',
     connectionFailedPrefix: 'Falha na conexão: ',
     typeClaude: 'Claude (Anthropic)',
     typeOpenai: 'OpenAI',

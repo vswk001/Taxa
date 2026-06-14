@@ -139,6 +139,7 @@ export default {
     nameRequired: '名前を入力してください',
     apiKeyRequired: 'APIキーを入力してください',
     connectionFailed: '接続失敗：有効な応答なし',
+    connectionSuccess: '接続成功',
     connectionFailedPrefix: '接続失敗：',
     typeClaude: 'Claude (Anthropic)',
     typeOpenai: 'OpenAI',
