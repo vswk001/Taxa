@@ -87,6 +87,13 @@
         </div>
       </div>
     </div>
+    <ConfirmDialog
+      :visible="confirmVisible"
+      :message="confirmMsg"
+      kind="danger"
+      @confirm="confirmResolve?.(true); confirmVisible = false"
+      @cancel="confirmResolve?.(false); confirmVisible = false"
+    />
   </div>
 </template>
 
@@ -95,8 +102,9 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/stores/settings';
 import { invoke } from '@tauri-apps/api/core';
-import { confirm as tauriConfirm, message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { setLocale, SUPPORTED_LOCALES } from '@/i18n';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import LlmProviderForm from './LlmProviderForm.vue';
 
 const props = defineProps<{ visible: boolean }>();
@@ -110,6 +118,17 @@ const editingProvider = ref<any>(null);
 const localTheme = ref<'light' | 'dark' | 'system'>(settingsStore.theme);
 const localLang = ref((localStorage.getItem('taxis-locale') || 'zh-CN'));
 const supportedLocales = SUPPORTED_LOCALES;
+const confirmVisible = ref(false);
+const confirmMsg = ref('');
+const confirmResolve = ref<((v: boolean) => void) | null>(null);
+
+function showConfirm(msg: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    confirmMsg.value = msg;
+    confirmVisible.value = true;
+    confirmResolve.value = resolve;
+  });
+}
 
 const tabs = [
   { key: 'general', icon: '⚙️', labelKey: 'settings.general' },
@@ -172,7 +191,7 @@ function handleEdit(p: any) {
 }
 
 async function handleDelete(id: string) {
-  const yes = await tauriConfirm(t('ai.deleteProviderConfirm'), { title: t('ai.deleteConfirmTitle'), kind: 'warning' });
+  const yes = await showConfirm(t('ai.deleteProviderConfirm'));
   if (yes) {
     try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
   }

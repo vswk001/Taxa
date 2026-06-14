@@ -72,6 +72,13 @@
       @confirm="inputDialog.onConfirm"
       @cancel="inputDialog.show = false"
     />
+    <ConfirmDialog
+      :visible="confirmState.visible"
+      :message="confirmState.message"
+      :kind="confirmState.kind"
+      @confirm="confirmState.onConfirm"
+      @cancel="confirmState.onCancel"
+    />
   </div>
 </template>
 
@@ -81,9 +88,10 @@ import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 import { invoke } from '@tauri-apps/api/core';
-import { confirm as tauriConfirm, message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import TreeNode from './TreeNode.vue';
 import InputDialog from '@/components/common/InputDialog.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import type { Folder, Note } from '@/types/notebook';
 
 const { t } = useI18n();
@@ -116,6 +124,29 @@ const inputDialog = ref<{
   show: false, title: '', placeholder: '', defaultValue: '',
   onConfirm: () => {},
 });
+
+const confirmState = ref<{
+  visible: boolean;
+  message: string;
+  kind: 'danger' | 'warning';
+  onConfirm: () => void;
+  onCancel: () => void;
+}>({
+  visible: false, message: '', kind: 'warning',
+  onConfirm: () => {}, onCancel: () => {},
+});
+
+function showConfirm(msg: string, options?: { kind?: 'danger' | 'warning' }): Promise<boolean> {
+  return new Promise((resolve) => {
+    confirmState.value = {
+      visible: true,
+      message: msg,
+      kind: options?.kind || 'danger',
+      onConfirm: () => { confirmState.value.visible = false; resolve(true); },
+      onCancel: () => { confirmState.value.visible = false; resolve(false); },
+    };
+  });
+}
 
 function showInputDialog(opts: {
   title: string;
@@ -254,7 +285,7 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'delete' && 'path' in target && 'name' in target) {
       const folder = target as Folder;
-      const yes = await tauriConfirm(t('tree.deleteFolderConfirm', { name: folder.name }), { title: t('tree.deleteConfirmTitle'), kind: 'warning' });
+      const yes = await showConfirm(t('tree.deleteFolderConfirm', { name: folder.name }), { kind: 'danger' });
       if (yes) {
         await notebookStore.deleteFolder(folder.path);
         notebookStore.currentFolder = '';
@@ -281,7 +312,7 @@ async function handleMenuAction(action: string) {
       }
     } else if (action === 'delete-note' && 'id' in target) {
       const note = target as Note;
-      const yes = await tauriConfirm(t('tree.deleteNoteConfirm', { title: note.title }), { title: t('tree.deleteConfirmTitle'), kind: 'warning' });
+      const yes = await showConfirm(t('tree.deleteNoteConfirm', { title: note.title }), { kind: 'danger' });
       if (yes) {
         await notebookStore.deleteNote(note.id);
         editorStore.closeTab(note.id);
