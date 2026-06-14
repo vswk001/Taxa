@@ -9,6 +9,7 @@ import { Milkdown, useEditor, useInstance } from '@milkdown/vue';
 import { Crepe } from '@milkdown/crepe';
 import '@milkdown/crepe/theme/classic.css';
 import '@milkdown/crepe/theme/common/style.css';
+import { EditorState } from 'prosemirror-state';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
 
 const { t } = useI18n();
@@ -64,9 +65,15 @@ watch(() => props.modelValue, (newValue) => {
       const doc = parser(newValue);
       if (!doc) return;
       const state = view.state;
-      view.dispatch(
-        state.tr.replaceWith(0, state.doc.content.size, doc.content),
-      );
+      const tr = state.tr.replaceWith(0, state.doc.content.size, doc.content);
+      tr.setMeta('addToHistory', false);
+      view.dispatch(tr);
+      // Reset editor state to clear undo/redo history
+      view.updateState(EditorState.create({
+        doc: view.state.doc,
+        selection: view.state.selection,
+        plugins: view.state.plugins,
+      }));
     });
   } finally {
     currentMarkdown = newValue;
