@@ -5,7 +5,13 @@ import type { ChatMessage, FileAttachment } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import i18n from '@/i18n';
 import { useNotebookStore } from './notebook';
+
+/** Translate via the global i18n instance — works inside/outside setup. */
+function t(key: string, named?: Record<string, unknown>): string {
+  return i18n.global.t(key, named as any);
+}
 
 function extractError(e: unknown): string {
   if (typeof e === 'string') return e;
@@ -16,12 +22,12 @@ function extractError(e: unknown): string {
     if (typeof obj.cause === 'string') return obj.cause;
     try { return JSON.stringify(e); } catch { /* fall through */ }
   }
-  return '未知错误';
+  return t('common.unknownError');
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`请求超时 (${ms / 1000}秒)`)), ms);
+    const timer = setTimeout(() => reject(new Error(t('ai.requestTimeout', { n: ms / 1000 }))), ms);
     promise.then(
       (val) => { clearTimeout(timer); resolve(val); },
       (err) => { clearTimeout(timer); reject(err); },
@@ -61,7 +67,7 @@ export const useAiStore = defineStore('ai', () => {
     messages.value.push({
       id: aiMsgId,
       role: 'assistant',
-      content: '正在分析...',
+      content: t('ai.analyzing'),
       timestamp: new Date().toISOString(),
       status: 'pending',
     });
@@ -85,8 +91,8 @@ export const useAiStore = defineStore('ai', () => {
         if (!msg.reasoning) msg.reasoning = '';
         msg.reasoning += text;
         // Show "thinking" instead of static placeholder while reasoning streams in
-        if (msg.content === '正在分析...') {
-          msg.content = '正在思考...';
+        if (msg.content === t('ai.analyzing')) {
+          msg.content = t('ai.thinkingStatus');
         }
       } else if (type === 'Fallback') {
         msg.fallbackInfo = { failed: text.failed, next: text.next };
@@ -106,7 +112,7 @@ export const useAiStore = defineStore('ai', () => {
       lastResult.value = result;
       const msg = getMsg();
       if (msg) {
-        msg.content = result.complexity === 'simple' ? '已自动处理' : '请确认以下操作';
+        msg.content = result.complexity === 'simple' ? t('ai.autoProcessed') : t('ai.confirmPrompt');
         msg.reasoning = result.reasoning;
         msg.status = 'done';
         msg.suggestions = [{
@@ -126,7 +132,7 @@ export const useAiStore = defineStore('ai', () => {
       console.error('[AI] submitInput failed:', e);
       const msg = getMsg();
       if (msg) {
-        msg.content = `处理失败: ${errMsg}`;
+        msg.content = t('ai.processFailed', { msg: errMsg });
         msg.status = 'error';
       }
     } finally {
@@ -149,7 +155,7 @@ export const useAiStore = defineStore('ai', () => {
     isProcessing.value = false;
     const lastMsg = messages.value[messages.value.length - 1];
     if (lastMsg && lastMsg.status === 'pending') {
-      lastMsg.content = '已取消';
+      lastMsg.content = t('ai.cancelled');
       lastMsg.status = 'error';
     }
   }
@@ -168,7 +174,7 @@ export const useAiStore = defineStore('ai', () => {
       messages.value.push({
         id: crypto.randomUUID(),
         role: 'system',
-        content: `已${result.action === 'create' ? '创建' : '更新'}笔记: ${result.title}`,
+        content: t(result.action === 'create' ? 'ai.noteCreated' : 'ai.noteUpdated', { title: result.title }),
         timestamp: new Date().toISOString(),
         status: 'done',
       });
@@ -185,7 +191,7 @@ export const useAiStore = defineStore('ai', () => {
       messages.value.push({
         id: crypto.randomUUID(),
         role: 'system',
-        content: `操作失败: ${errMsg}`,
+        content: t('ai.operationFailed', { msg: errMsg }),
         timestamp: new Date().toISOString(),
         status: 'error',
       });
@@ -214,7 +220,7 @@ export const useAiStore = defineStore('ai', () => {
     messages.value.push({
       id: aiMsgId,
       role: 'assistant',
-      content: '正在优化...',
+      content: t('ai.optimizing'),
       timestamp: new Date().toISOString(),
       status: 'pending',
     });
@@ -231,7 +237,7 @@ export const useAiStore = defineStore('ai', () => {
       if (type === 'Reasoning') {
         if (!msg.reasoning) msg.reasoning = '';
         msg.reasoning += text;
-        if (msg.content === '正在优化...') msg.content = '正在思考...';
+        if (msg.content === t('ai.optimizing')) msg.content = t('ai.thinkingStatus');
       } else if (type === 'Fallback') {
         msg.fallbackInfo = { failed: text.failed, next: text.next };
       }
@@ -247,7 +253,7 @@ export const useAiStore = defineStore('ai', () => {
 
       const msg = getMsg();
       if (msg) {
-        msg.content = result.summary || '优化完成';
+        msg.content = result.summary || t('ai.optimizeDone');
         msg.reasoning = undefined;
         msg.status = 'done';
         // Store optimize result as a special suggestion
@@ -264,7 +270,7 @@ export const useAiStore = defineStore('ai', () => {
       const errMsg = extractError(e);
       const msg = getMsg();
       if (msg) {
-        msg.content = `优化失败: ${errMsg}`;
+        msg.content = t('ai.optimizeFailed', { msg: errMsg });
         msg.status = 'error';
       }
     } finally {
@@ -289,7 +295,7 @@ export const useAiStore = defineStore('ai', () => {
       messages.value.push({
         id: crypto.randomUUID(),
         role: 'system',
-        content: `已应用优化`,
+        content: t('ai.optimizeApplied'),
         timestamp: new Date().toISOString(),
         status: 'done',
       });
@@ -298,7 +304,7 @@ export const useAiStore = defineStore('ai', () => {
       messages.value.push({
         id: crypto.randomUUID(),
         role: 'system',
-        content: `应用失败: ${errMsg}`,
+        content: t('ai.applyFailed', { msg: errMsg }),
         timestamp: new Date().toISOString(),
         status: 'error',
       });
