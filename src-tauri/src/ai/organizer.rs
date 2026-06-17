@@ -78,10 +78,11 @@ impl AiOrganizer {
         folder_structure: &str,
         related_notes: &str,
         on_event: Option<StreamCallback>,
+        locale: &str,
     ) -> AppResult<OrganizeResult> {
         eprintln!("[AI] process_user_input: provider={}, model={}", config.name, config.model_name);
         let provider = create_provider(config)?;
-        let messages = PromptTemplates::categorize(content, folder_structure, related_notes);
+        let messages = PromptTemplates::categorize(content, folder_structure, related_notes, locale);
         eprintln!("[AI] Sending chat request with {} messages", messages.len());
 
         let options = ChatOptions {
@@ -110,9 +111,10 @@ impl AiOrganizer {
         config: &ProviderConfig,
         title: &str,
         content: &str,
+        locale: &str,
     ) -> AppResult<EnrichResult> {
         let provider = create_provider(config)?;
-        let messages = PromptTemplates::enrich(title, content);
+        let messages = PromptTemplates::enrich(title, content, locale);
         let response = provider.chat(messages, ChatOptions::default()).await?;
 
         let json_str = extract_json(&response.content);
@@ -129,9 +131,10 @@ impl AiOrganizer {
         content: &str,
         instruction: &str,
         on_event: Option<StreamCallback>,
+        locale: &str,
     ) -> AppResult<OptimizeResult> {
         let provider = create_provider(config)?;
-        let messages = PromptTemplates::optimize(title, content, instruction);
+        let messages = PromptTemplates::optimize(title, content, instruction, locale);
         let options = ChatOptions { max_tokens: 8192, ..ChatOptions::default() };
 
         let response = match on_event {

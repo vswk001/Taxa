@@ -3,8 +3,31 @@ use crate::ai::provider::Message;
 
 pub struct PromptTemplates;
 
+/// Appended to system prompts so the LLM outputs (and reasons) in the user's
+/// selected UI language. The directive itself is written in Chinese since the
+/// base prompts are Chinese; it names the target language explicitly.
+pub fn language_directive(locale: &str) -> String {
+    let lang = match locale {
+        "zh-CN" | "zh-TW" => "中文",
+        "en" => "English",
+        "es" => "Español",
+        "ar" => "العربية",
+        "pt" => "Português",
+        "ja" => "日本語",
+        "fr" => "Français",
+        "de" => "Deutsch",
+        _ => "中文",
+    };
+    format!(
+        "\n\n## 语言要求\n\
+         所有输出文本（标题、内容、摘要、标签、文件夹名称、变更说明）必须使用 {lang}。\n\
+         请使用 {lang} 进行思考和回复（包括思考过程）。",
+        lang = lang
+    )
+}
+
 impl PromptTemplates {
-    pub fn categorize(raw_content: &str, folder_structure: &str, related_notes: &str) -> Vec<Message> {
+    pub fn categorize(raw_content: &str, folder_structure: &str, related_notes: &str, locale: &str) -> Vec<Message> {
         // Sanitize: remove null bytes, limit content length
         let content: String = raw_content
             .replace('\0', "")
@@ -37,9 +60,10 @@ impl PromptTemplates {
                     - folder: 必须是目录结构中已有的或合理的新路径\n\
                     - content: append时只填新增部分（系统会自动追加到原有内容后）；create时填完整内容\n\
                     - complexity: simple=简短内容可直接应用, complex=复杂内容需用户确认\n\
-                    - tags: 建议的标签（合并已有笔记的标签和新标签）",
+                    - tags: 建议的标签（合并已有笔记的标签和新标签）{directive}",
                     folder_structure = folder_structure,
                     related_notes = related_notes,
+                    directive = language_directive(locale),
                 ),
             },
             Message {
@@ -49,17 +73,20 @@ impl PromptTemplates {
         ]
     }
 
-    pub fn enrich(title: &str, content: &str) -> Vec<Message> {
+    pub fn enrich(title: &str, content: &str, locale: &str) -> Vec<Message> {
         vec![
             Message {
                 role: "system".into(),
-                content: "你是一个笔记内容助手。用户会给你一篇笔记的标题和内容，你需要：\n\
-                1. 完善内容（补充缺失信息、改善格式、修正错别字）\n\
-                2. 生成一个简洁的摘要（不超过100字）\n\
-                3. 建议合适的标签\n\n\
-                返回JSON格式（不要markdown代码块）：\n\
-                {\"title\": \"建议的标题\", \"content\": \"完善后的内容\", \
-                \"summary\": \"摘要\", \"tags\": [\"标签\"]}".into(),
+                content: format!(
+                    "你是一个笔记内容助手。用户会给你一篇笔记的标题和内容，你需要：\n\
+                    1. 完善内容（补充缺失信息、改善格式、修正错别字）\n\
+                    2. 生成一个简洁的摘要（不超过100字）\n\
+                    3. 建议合适的标签\n\n\
+                    返回JSON格式（不要markdown代码块）：\n\
+                    {{\"title\": \"建议的标题\", \"content\": \"完善后的内容\", \
+                    \"summary\": \"摘要\", \"tags\": [\"标签\"]}}{}",
+                    language_directive(locale)
+                ),
             },
             Message {
                 role: "user".into(),
@@ -68,7 +95,7 @@ impl PromptTemplates {
         ]
     }
 
-    pub fn optimize(title: &str, content: &str, instruction: &str) -> Vec<Message> {
+    pub fn optimize(title: &str, content: &str, instruction: &str, locale: &str) -> Vec<Message> {
         let content_clean: String = content.replace('\0', "").chars().take(80000).collect();
         let instruction_clean = if instruction.trim().is_empty() {
             "请全面优化这篇笔记".to_string()
@@ -78,17 +105,20 @@ impl PromptTemplates {
         vec![
             Message {
                 role: "system".into(),
-                content: "你是一个笔记优化助手。用户会给你一篇已有笔记的标题和内容，以及优化指令。\n\
-                你需要根据指令对笔记内容进行修改优化，保持笔记的核心信息不变。\n\n\
-                返回纯JSON（不要markdown代码块）：\n\
-                {\"title\": \"优化后的标题\", \"content\": \"优化后的完整内容\", \
-                \"summary\": \"变更说明（简述做了哪些修改）\"}\n\n\
-                要求：\n\
-                - title: 如果优化指令未涉及标题，保持原标题不变\n\
-                - content: 返回完整的优化后内容（不是增量）\n\
-                - summary: 简述你做了哪些修改（一句话）\n\
-                - 保持原有的markdown格式\n\
-                - 不要添加原文中没有的信息，除非指令明确要求".into(),
+                content: format!(
+                    "你是一个笔记优化助手。用户会给你一篇已有笔记的标题和内容，以及优化指令。\n\
+                    你需要根据指令对笔记内容进行修改优化，保持笔记的核心信息不变。\n\n\
+                    返回纯JSON（不要markdown代码块）：\n\
+                    {{\"title\": \"优化后的标题\", \"content\": \"优化后的完整内容\", \
+                    \"summary\": \"变更说明（简述做了哪些修改）\"}}\n\n\
+                    要求：\n\
+                    - title: 如果优化指令未涉及标题，保持原标题不变\n\
+                    - content: 返回完整的优化后内容（不是增量）\n\
+                    - summary: 简述你做了哪些修改（一句话）\n\
+                    - 保持原有的markdown格式\n\
+                    - 不要添加原文中没有的信息，除非指令明确要求{}",
+                    language_directive(locale)
+                ),
             },
             Message {
                 role: "user".into(),

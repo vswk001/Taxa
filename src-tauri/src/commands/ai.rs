@@ -14,6 +14,7 @@ pub async fn ai_process_input(
     app: AppHandle,
     content: String,
     seq: u32,
+    locale: String,
 ) -> AppResult<OrganizeResult> {
     eprintln!("[AI] process_input START: content_len={}", content.len());
 
@@ -72,7 +73,7 @@ pub async fn ai_process_input(
         let _ = app_handle.emit("ai-stream", payload);
     });
 
-    let result = engine.process_input_stream(&content, &folder_structure, &related_notes, on_event).await;
+    let result = engine.process_input_stream(&content, &folder_structure, &related_notes, on_event, &locale).await;
     match &result {
         Ok(r) => {
             eprintln!("[AI] process_input OK: action={}, title={}", r.action, r.title);
@@ -133,6 +134,7 @@ pub async fn ai_optimize_note(
     note_id: String,
     instruction: String,
     seq: u32,
+    locale: String,
 ) -> AppResult<OptimizeResult> {
     let (title, content) = {
         let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
@@ -149,11 +151,11 @@ pub async fn ai_optimize_note(
         let _ = app_handle.emit("ai-stream", payload);
     });
 
-    engine.optimize_note(&title, &content, &instruction, Some(on_event)).await
+    engine.optimize_note(&title, &content, &instruction, Some(on_event), &locale).await
 }
 
 #[tauri::command]
-pub async fn ai_enrich_note(state: State<'_, AppState>, note_id: String) -> AppResult<crate::ai::organizer::EnrichResult> {
+pub async fn ai_enrich_note(state: State<'_, AppState>, note_id: String, locale: String) -> AppResult<crate::ai::organizer::EnrichResult> {
     let (title, content) = {
         let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
         let md = MarkdownStorage::new(state.notes_dir());
@@ -162,7 +164,7 @@ pub async fn ai_enrich_note(state: State<'_, AppState>, note_id: String) -> AppR
     };
 
     let engine = state.ai_engine.read().await;
-    engine.enrich_note(&title, &content).await
+    engine.enrich_note(&title, &content, &locale).await
 }
 
 #[tauri::command]

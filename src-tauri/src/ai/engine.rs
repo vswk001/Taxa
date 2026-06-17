@@ -95,6 +95,7 @@ impl AiEngine {
         folder_structure: &str,
         related_notes: &str,
         on_event: StreamCallback,
+        locale: &str,
     ) -> AppResult<OrganizeResult> {
         let providers = self.get_providers_in_order();
         if providers.is_empty() {
@@ -108,7 +109,7 @@ impl AiEngine {
         for (idx, config) in providers.iter().enumerate() {
             let (cb, emitted) = Self::wrap_with_tracker(&user_on_event);
             match AiOrganizer::process_user_input_stream(
-                config, content, folder_structure, related_notes, cb,
+                config, content, folder_structure, related_notes, cb, locale,
             ).await {
                 Ok(result) => {
                     if idx > 0 {
@@ -130,7 +131,7 @@ impl AiEngine {
         Err(last_err.unwrap_or_else(|| AppError::AiEngine("All providers failed".into())))
     }
 
-    pub async fn enrich_note(&self, title: &str, content: &str) -> AppResult<EnrichResult> {
+    pub async fn enrich_note(&self, title: &str, content: &str, locale: &str) -> AppResult<EnrichResult> {
         let providers = self.get_providers_in_order();
         if providers.is_empty() {
             return Err(AppError::AiEngine(
@@ -140,7 +141,7 @@ impl AiEngine {
 
         let mut last_err: Option<AppError> = None;
         for (idx, config) in providers.iter().enumerate() {
-            match AiOrganizer::enrich_note(config, title, content).await {
+            match AiOrganizer::enrich_note(config, title, content, locale).await {
                 Ok(result) => {
                     if idx > 0 {
                         eprintln!("[AI] Fallback succeeded with provider '{}'", config.name);
@@ -162,6 +163,7 @@ impl AiEngine {
         content: &str,
         instruction: &str,
         on_event: Option<StreamCallback>,
+        locale: &str,
     ) -> AppResult<OptimizeResult> {
         let providers = self.get_providers_in_order();
         if providers.is_empty() {
@@ -173,7 +175,7 @@ impl AiEngine {
         let mut last_err: Option<AppError> = None;
         for (idx, config) in providers.iter().enumerate() {
             let (cb, emitted) = Self::wrap_with_tracker(&on_event);
-            match AiOrganizer::optimize_note(config, title, content, instruction, cb).await {
+            match AiOrganizer::optimize_note(config, title, content, instruction, cb, locale).await {
                 Ok(result) => {
                     if idx > 0 {
                         eprintln!("[AI] Fallback succeeded with provider '{}'", config.name);

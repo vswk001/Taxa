@@ -13,6 +13,12 @@ function t(key: string, named?: Record<string, unknown>): string {
   return i18n.global.t(key, named as any);
 }
 
+/** Current UI locale code (e.g. "en"), passed to the backend so the LLM
+ *  outputs and reasons in the user's language. */
+function currentLocale(): string {
+  return (i18n.global.locale as any).value || 'zh-CN';
+}
+
 function extractError(e: unknown): string {
   if (typeof e === 'string') return e;
   if (e instanceof Error) return e.message;
@@ -102,7 +108,7 @@ export const useAiStore = defineStore('ai', () => {
     try {
       console.log('[AI] submitInput: calling invoke, seq=', seq);
       const result = await withTimeout(
-        invoke<OrganizeResult>('ai_process_input', { content: fullContent, seq }),
+        invoke<OrganizeResult>('ai_process_input', { content: fullContent, seq, locale: currentLocale() }),
         120_000,
       );
       console.log('[AI] submitInput: invoke returned', result);
@@ -245,7 +251,7 @@ export const useAiStore = defineStore('ai', () => {
 
     try {
       const result = await withTimeout(
-        invoke<{ title: string; content: string; summary: string }>('ai_optimize_note', { noteId, instruction, seq }),
+        invoke<{ title: string; content: string; summary: string }>('ai_optimize_note', { noteId, instruction, seq, locale: currentLocale() }),
         120_000,
       );
 
