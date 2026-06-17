@@ -19,6 +19,23 @@ impl Database {
         Ok(db)
     }
 
+    /// Open an existing database without running migrations or creating it.
+    /// Used by the read-only MCP server, which must not manage schema or create
+    /// files. Errors if the database file does not exist.
+    pub fn open_existing(path: &Path) -> AppResult<Self> {
+        if !path.exists() {
+            return Err(AppError::Database(format!(
+                "Database not found: {}. Start the Taxis app once to initialize it.",
+                path.display()
+            )));
+        }
+        let conn = Connection::open(path)
+            .map_err(|e| AppError::Database(format!("Failed to open database: {}", e)))?;
+        // WAL allows concurrent readers; tolerate a writer briefly.
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        Ok(Self { conn })
+    }
+
     fn run_migrations(&self) -> AppResult<()> {
         self.conn
             .execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")

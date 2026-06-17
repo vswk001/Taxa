@@ -1,11 +1,11 @@
 // src-tauri/src/lib.rs
 mod commands;
-mod error;
+pub mod error;
 mod state;
-mod storage;
-mod notebook;
+pub mod storage;
+pub mod notebook;
 mod ai;
-mod link;
+pub mod link;
 
 use state::AppState;
 use std::path::PathBuf;
