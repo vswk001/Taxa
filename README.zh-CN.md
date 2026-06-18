@@ -22,7 +22,7 @@
 
 Taxis 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，AI 会判断它属于哪里——新建一篇笔记，或追加到已有相关笔记，并给出整洁的标题、目录和标签。它还能按指令润色、改写已有笔记。自带 LLM（Claude、OpenAI、GLM、DeepSeek、MiniMax、Kimi，或任何 OpenAI 兼容接口），并支持多 provider 自动 fallback。
 
-它还附带一个**只读 MCP 服务器**，让 Claude Code、Codex 等工具能搜索并读取你的笔记，作为本地知识库。
+它还附带一个 **MCP 服务器**，让 Claude Code、Codex 等工具能搜索并读取你的笔记，作为本地知识库。
 
 ## ✨ 功能特性
 
@@ -32,7 +32,7 @@ Taxis 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，A
   - *整理*——丢入任意文字，AI 自动归类、拟标题、打标签、归档（新建或追加到相关笔记）。
   - *润色*——按指令优化、改写已有笔记。
 - **多 provider LLM**——可配置多个 provider，自动在它们之间 fallback；拖拽即可调整备用顺序。支持流式输出与思考过程展示。
-- **MCP 知识库**——通过 Model Context Protocol 把笔记暴露为只读知识库，支持 MCP 的 AI 编程助手可搜索并读取，作为工作上下文。
+- **MCP 知识库**——通过 Model Context Protocol 把笔记暴露为知识库，支持 MCP 的 AI 编程助手可搜索并读取，作为工作上下文。
 - **全文搜索**——基于 FTS5，覆盖标题、标签、内容。
 - **笔记图谱**——用 `[[双链]]` 关联笔记，可视化探索。
 - **9 种语言**——简体中文、繁體中文、English、Español、العربية（RTL）、Português、日本語、Français、Deutsch。
@@ -112,7 +112,7 @@ Taxis/
    │  ├─ notebook/       # 笔记增删改查、搜索、目录
    │  ├─ ai/             # LLM provider、prompt、整理引擎
    │  ├─ storage/        # SQLite + Markdown 存储
-   │  └─ bin/mcp/        # 只读 MCP 服务器二进制
+   │  └─ bin/mcp/        # MCP 服务器二进制
    └─ tauri.conf.json
 ```
 

@@ -22,7 +22,7 @@ Capture anything — Taxis auto-categorizes, enriches, and connects it. All data
 
 Taxis is a note-taking app with a built-in AI assistant. Write or paste raw text and the AI decides where it belongs — creating a new note or appending to an existing one, with a clean title, folder, and tags. It can also polish and rewrite existing notes. Bring your own LLM (Claude, OpenAI, GLM, DeepSeek, MiniMax, Kimi, or any OpenAI-compatible API), with automatic fallback between providers.
 
-It also ships a **read-only MCP server**, so tools like Claude Code and Codex can search and read your notes as a local knowledge base.
+It also ships an **MCP server**, so tools like Claude Code and Codex can search and read your notes as a local knowledge base.
 
 ## ✨ Features
 
@@ -32,7 +32,7 @@ It also ships a **read-only MCP server**, so tools like Claude Code and Codex ca
   - *Organize* — drop in any text; the AI categorizes, titles, tags, and files it (new note or append to a related one).
   - *Polish* — optimize and rewrite an existing note on instruction.
 - **Multi-provider LLM** — configure several providers and let Taxis automatically fall back between them. Drag to set the fallback order. Streaming with reasoning shown.
-- **MCP knowledge base** — expose your notes as a read-only knowledge base over the Model Context Protocol, so AI coding assistants can search and read them as context.
+- **MCP knowledge base** — expose your notes as a knowledge base over the Model Context Protocol, so AI coding assistants can search and read them as context.
 - **Full-text search** — FTS5-backed search across titles, tags, and content.
 - **Note graph** — `[[wikilink]]` notes together and explore the graph.
 - **9 languages** — 简体中文, 繁體中文, English, Español, العربية (RTL), Português, 日本語, Français, Deutsch.
@@ -112,7 +112,7 @@ Taxis/
    │  ├─ notebook/       # notes CRUD, search, folders
    │  ├─ ai/             # LLM providers, prompts, organizer engine
    │  ├─ storage/        # SQLite + Markdown storage
-   │  └─ bin/mcp/        # the read-only MCP server binary
+   │  └─ bin/mcp/        # the MCP server binary
    └─ tauri.conf.json
 ```
 
