@@ -1,0 +1,149 @@
+name: Release
+
+# Build native installers for Windows, macOS, and Linux and attach them to a
+# GitHub release. Triggered by pushing a tag like `v0.1.0`, or manually from the
+# Actions tab (use "Run workflow" and supply a tag name).
+#
+# Tauri apps can't be cross-compiled from one OS — each platform needs its own
+# toolchain + native webview — so this runs on three OS runners in parallel.
+# Builds are unsigned; users may see an "unidentified developer" warning until
+# signing certificates are configured (see notes in docs/mcp-server.md area).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS: one universal binary covering Apple Silicon + Intel.
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets (universal binary)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          releaseName: 'Taxis ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}'
+          releaseBody: |
+            Cross-platform builds for Windows, macOS, and Linux.
+            Download the asset matching your platform from the list below.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # Standalone taxis-mcp binaries, uploaded to the same release. Runs after the
+  # app release exists. Native per-platform build (universal on macOS).
+  mcp-binaries:
+    permissions:
+      contents: write
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            artifact: taxis-mcp-linux-x86_64
+          - platform: windows-latest
+            artifact: taxis-mcp-windows-x86_64.exe
+          - platform: macos-latest
+            artifact: taxis-mcp-macos-universal
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets (universal binary)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Build taxis-mcp (Linux / Windows)
+        if: matrix.platform != 'macos-latest'
+        working-directory: src-tauri
+        run: cargo build --release --bin taxis-mcp
+
+      - name: Build taxis-mcp (macOS universal)
+        if: matrix.platform == 'macos-latest'
+        working-directory: src-tauri
+        run: |
+          cargo build --release --target aarch64-apple-darwin --bin taxis-mcp
+          cargo build --release --target x86_64-apple-darwin --bin taxis-mcp
+          lipo -create -output taxis-mcp \
+            target/aarch64-apple-darwin/release/taxis-mcp \
+            target/x86_64-apple-darwin/release/taxis-mcp
+
+      - name: Stage binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            cp src-tauri/target/release/taxis-mcp.exe "${{ matrix.artifact }}"
+          elif [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            cp src-tauri/taxis-mcp "${{ matrix.artifact }}"
+          else
+            cp src-tauri/target/release/taxis-mcp "${{ matrix.artifact }}"
+          fi
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Taxis $TAG" --generate-notes
+          fi
+          gh release upload "$TAG" "${{ matrix.artifact }}" --clobber
