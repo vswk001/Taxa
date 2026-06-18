@@ -57,5 +57,5 @@ You can build your own platform locally to sanity-check before tagging:
 ```bash
 npm install
 npm run tauri build          # produces your platform's installer
-cd src-tauri && cargo build --release --bin taxis-mcp
+cargo build --release --bin taxis-mcp
 ```

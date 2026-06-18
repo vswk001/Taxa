@@ -9,13 +9,13 @@ the same database + markdown files. It never writes.
 
 ## Build
 
-From the `src-tauri` directory:
+From the repository root:
 
 ```bash
 cargo build --release --bin taxis-mcp
 ```
 
-The binary lands at `src-tauri/target/release/taxis-mcp` (`.exe` on Windows).
+The binary lands at `target/release/taxis-mcp` (`.exe` on Windows).
 
 ## Wire it into Claude Code
 

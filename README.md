@@ -65,7 +65,6 @@ npm run tauri build    # produce a production build
 The MCP server is a separate binary that exposes your notes to AI coding tools:
 
 ```bash
-cd src-tauri
 cargo build --release --bin taxis-mcp
 ```
 
@@ -107,13 +106,13 @@ Taxis/
 │  ├─ components/        # editor, AI sidebar, tree, settings
 │  ├─ stores/            # Pinia stores
 │  └─ i18n/              # locales (9 languages)
-└─ src-tauri/
-   ├─ src/
-   │  ├─ notebook/       # notes CRUD, search, folders
-   │  ├─ ai/             # LLM providers, prompts, organizer engine
-   │  ├─ storage/        # SQLite + Markdown storage
-   │  └─ bin/mcp/        # the MCP server binary
-   └─ tauri.conf.json
+├─ src-tauri/            # Tauri desktop app crate
+│  └─ src/
+│     ├─ notebook/       # notes CRUD, search, folders
+│     ├─ ai/             # LLM providers, prompts, organizer engine
+│     └─ storage/        # SQLite + Markdown storage
+├─ mcp/                  # the MCP server binary (standalone crate)
+└─ Cargo.toml            # workspace root
 ```
 
 ## 🌍 Internationalization

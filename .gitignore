@@ -23,9 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# Rust/Tauri
+# Rust/Tauri (workspace build output)
+/target/
 src-tauri/target/
-src-tauri/Cargo.lock
 
 # OS
 Thumbs.db

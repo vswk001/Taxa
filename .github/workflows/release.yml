@@ -113,12 +113,10 @@ jobs:
 
       - name: Build taxis-mcp (Linux / Windows)
         if: matrix.platform != 'macos-latest'
-        working-directory: src-tauri
         run: cargo build --release --bin taxis-mcp
 
       - name: Build taxis-mcp (macOS universal)
         if: matrix.platform == 'macos-latest'
-        working-directory: src-tauri
         run: |
           cargo build --release --target aarch64-apple-darwin --bin taxis-mcp
           cargo build --release --target x86_64-apple-darwin --bin taxis-mcp
@@ -130,11 +128,11 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "windows-latest" ]; then
-            cp src-tauri/target/release/taxis-mcp.exe "${{ matrix.artifact }}"
+            cp target/release/taxis-mcp.exe "${{ matrix.artifact }}"
           elif [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            cp src-tauri/taxis-mcp "${{ matrix.artifact }}"
+            cp taxis-mcp "${{ matrix.artifact }}"
           else
-            cp src-tauri/target/release/taxis-mcp "${{ matrix.artifact }}"
+            cp target/release/taxis-mcp "${{ matrix.artifact }}"
           fi
 
       - name: Upload to release

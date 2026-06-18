@@ -65,7 +65,6 @@ npm run tauri build    # 构建生产版本
 MCP 服务器是一个独立二进制，把你的笔记暴露给 AI 编程工具：
 
 ```bash
-cd src-tauri
 cargo build --release --bin taxis-mcp
 ```
 
@@ -107,13 +106,13 @@ Taxis/
 │  ├─ components/        # 编辑器、AI 侧边栏、目录树、设置
 │  ├─ stores/            # Pinia stores
 │  └─ i18n/              # 9 种语言文案
-└─ src-tauri/
-   ├─ src/
-   │  ├─ notebook/       # 笔记增删改查、搜索、目录
-   │  ├─ ai/             # LLM provider、prompt、整理引擎
-   │  ├─ storage/        # SQLite + Markdown 存储
-   │  └─ bin/mcp/        # MCP 服务器二进制
-   └─ tauri.conf.json
+├─ src-tauri/            # Tauri 桌面应用 crate
+│  └─ src/
+│     ├─ notebook/       # 笔记增删改查、搜索、目录
+│     ├─ ai/             # LLM provider、prompt、整理引擎
+│     └─ storage/        # SQLite + Markdown 存储
+├─ mcp/                  # MCP 服务器二进制（独立 crate）
+└─ Cargo.toml            # workspace 根
 ```
 
 ## 🌍 国际化

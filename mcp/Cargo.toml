@@ -1,0 +1,17 @@
+[package]
+name = "taxis-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Taxis MCP server — exposes the note knowledge base over stdio"
+
+[[bin]]
+name = "taxis-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# Shares the app's storage + notebook modules. The package is `taxis`
+# (lib name `taxis_lib`); alias it so code uses `taxis_lib::`.
+taxis_lib = { package = "taxis", path = "../src-tauri" }
+serde_json = "1"
+dirs = "5"
+rusqlite = "0.31"

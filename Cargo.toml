@@ -1,0 +1,7 @@
+# Cargo workspace: the Tauri desktop app (src-tauri) plus the standalone
+# taxis-mcp server (mcp). Keeping the MCP binary in its own crate means the
+# Tauri bundler only sees one app binary and doesn't mistake taxis-mcp for a
+# bundled sidecar.
+[workspace]
+resolver = "2"
+members = ["src-tauri", "mcp"]

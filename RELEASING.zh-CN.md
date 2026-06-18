@@ -45,5 +45,5 @@ git push origin v0.1.0
 ```bash
 npm install
 npm run tauri build          # 产出当前平台的安装包
-cd src-tauri && cargo build --release --bin taxis-mcp
+cargo build --release --bin taxis-mcp
 ```
