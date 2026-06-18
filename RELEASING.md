@@ -1,3 +1,5 @@
+**English** | [简体中文](RELEASING.zh-CN.md)
+
 # Releasing
 
 Cross-platform builds are produced by the **Release** workflow
@@ -25,11 +27,11 @@ git push origin v0.1.0
 The workflow creates a **draft** release named `Taxis <tag>` with the
 platform installers attached:
 
-| Platform | Assets |
-|----------|--------|
-| Windows | `.msi` / `.exe` installer + `taxis-mcp-windows-x86_64.exe` |
-| macOS | `.dmg` (universal, Apple Silicon + Intel) + `taxis-mcp-macos-universal` |
-| Linux | `.deb` / `.AppImage` + `taxis-mcp-linux-x86_64` |
+| Platform | Assets                                                                  |
+| -------- | ----------------------------------------------------------------------- |
+| Windows  | `.msi` / `.exe` installer + `taxis-mcp-windows-x86_64.exe`              |
+| macOS    | `.dmg` (universal, Apple Silicon + Intel) + `taxis-mcp-macos-universal` |
+| Linux    | `.deb` / `.AppImage` + `taxis-mcp-linux-x86_64`                         |
 
 Review the draft release on GitHub, edit the notes if you like, then
 **publish** it.
