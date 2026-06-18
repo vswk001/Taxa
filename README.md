@@ -20,7 +20,7 @@ Capture anything — Taxis auto-categorizes, enriches, and connects it. All data
 
 ---
 
-Taxis is an Obsidian-style note-taking app with a built-in AI assistant. Write or paste raw text and the AI decides where it belongs — creating a new note or appending to an existing one, with a clean title, folder, and tags. It can also polish and rewrite existing notes. Bring your own LLM (Claude, OpenAI, GLM, DeepSeek, MiniMax, Kimi, or any OpenAI-compatible API), with automatic fallback between providers.
+Taxis is a note-taking app with a built-in AI assistant. Write or paste raw text and the AI decides where it belongs — creating a new note or appending to an existing one, with a clean title, folder, and tags. It can also polish and rewrite existing notes. Bring your own LLM (Claude, OpenAI, GLM, DeepSeek, MiniMax, Kimi, or any OpenAI-compatible API), with automatic fallback between providers.
 
 It also ships a **read-only MCP server**, so tools like Claude Code and Codex can search and read your notes as a local knowledge base.
 

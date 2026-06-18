@@ -20,7 +20,7 @@
 
 ---
 
-Taxis 是一款 Obsidian 风格的笔记应用，内置 AI 助手。写下或粘贴任意文字，AI 会判断它属于哪里——新建一篇笔记，或追加到已有相关笔记，并给出整洁的标题、目录和标签。它还能按指令润色、改写已有笔记。自带 LLM（Claude、OpenAI、GLM、DeepSeek、MiniMax、Kimi，或任何 OpenAI 兼容接口），并支持多 provider 自动 fallback。
+Taxis 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，AI 会判断它属于哪里——新建一篇笔记，或追加到已有相关笔记，并给出整洁的标题、目录和标签。它还能按指令润色、改写已有笔记。自带 LLM（Claude、OpenAI、GLM、DeepSeek、MiniMax、Kimi，或任何 OpenAI 兼容接口），并支持多 provider 自动 fallback。
 
 它还附带一个**只读 MCP 服务器**，让 Claude Code、Codex 等工具能搜索并读取你的笔记，作为本地知识库。
 
