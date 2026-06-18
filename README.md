@@ -32,6 +32,7 @@ It also ships a **read-only MCP server**, so tools like Claude Code and Codex ca
   - *Organize* — drop in any text; the AI categorizes, titles, tags, and files it (new note or append to a related one).
   - *Polish* — optimize and rewrite an existing note on instruction.
 - **Multi-provider LLM** — configure several providers and let Taxis automatically fall back between them. Drag to set the fallback order. Streaming with reasoning shown.
+- **MCP knowledge base** — expose your notes as a read-only knowledge base over the Model Context Protocol, so AI coding assistants can search and read them as context.
 - **Full-text search** — FTS5-backed search across titles, tags, and content.
 - **Note graph** — `[[wikilink]]` notes together and explore the graph.
 - **9 languages** — 简体中文, 繁體中文, English, Español, العربية (RTL), Português, 日本語, Français, Deutsch.
