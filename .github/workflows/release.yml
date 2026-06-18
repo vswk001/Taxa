@@ -67,8 +67,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseName: 'Taxis ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}'
+          tagName: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          releaseName: "Taxis ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           releaseBody: |
             Cross-platform builds for Windows, macOS, and Linux.
             Download the asset matching your platform from the list below.
@@ -141,7 +141,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          TAG: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "Taxis $TAG" --generate-notes
