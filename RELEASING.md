@@ -36,19 +36,18 @@ platform installers attached:
 Review the draft release on GitHub, edit the notes if you like, then
 **publish** it.
 
-## Signing (optional)
+## Signing
 
-Builds are currently unsigned. Windows and macOS will warn "unidentified
-developer." To silence that, configure signing:
+The workflow signs **conditionally**: it signs automatically once the relevant
+GitHub Secrets exist, and produces an unsigned build otherwise (no failure).
 
-- **macOS:** an Apple Developer ID certificate + notarization
-  (`APPLE_CERTIFICATE`, `APPLE_ID`, `APPLE_PASSWORD` secrets passed to
-  `tauri-action`).
-- **Windows:** a code-signing certificate
-  (`WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`).
+- **macOS** is already wired — add the 6 `APPLE_*` secrets (Apple Developer ID
+  certificate + notarization) and the next release signs + notarizes.
+- **Windows** depends on the certificate source (Azure Trusted Signing,
+  SignPath, or a PFX/USB-token cert); each is configured differently.
 
-See the [`tauri-action` docs](https://github.com/tauri-apps/tauri-action)
-for the secret names.
+Full steps (obtaining certs, the exact secret names, verifying the signature)
+are in [`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md).
 
 ## Local verification
 

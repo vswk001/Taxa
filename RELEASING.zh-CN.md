@@ -29,14 +29,14 @@ git push origin v0.1.0
 
 到 GitHub 上查看草稿 release，按需编辑说明，然后点击**发布**。
 
-## 代码签名（可选）
+## 代码签名
 
-当前构建未签名。Windows 和 macOS 会提示「未知开发者」。要消除提示，请配置签名：
+工作流是**条件式签名**：填了对应 GitHub Secrets 就自动签名，没填照常出未签名包（不影响构建）。
 
-- **macOS：** Apple Developer ID 证书 + 公证（将 `APPLE_CERTIFICATE`、`APPLE_ID`、`APPLE_PASSWORD` 等 secrets 传给 `tauri-action`）。
-- **Windows：** 代码签名证书（`WINDOWS_CERTIFICATE`、`WINDOWS_CERTIFICATE_PASSWORD`）。
+- **macOS 已接好** —— 加 6 个 `APPLE_*` secret（Apple Developer ID 证书 + 公证），下次发版自动签名+公证。
+- **Windows** 取决于证书来源（Azure Trusted Signing / SignPath / PFX 或 USB token 证书），三种接法不同。
 
-密钥名详见 [`tauri-action` 文档](https://github.com/tauri-apps/tauri-action)。
+完整步骤（如何拿证书、确切的 secret 名、验证签名是否生效）见 [`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md)。
 
 ## 本地预检
 
