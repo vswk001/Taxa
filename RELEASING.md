@@ -38,16 +38,15 @@ Review the draft release on GitHub, edit the notes if you like, then
 
 ## Signing
 
-The workflow signs **conditionally**: it signs automatically once the relevant
-GitHub Secrets exist, and produces an unsigned build otherwise (no failure).
+Builds are **unsigned by choice** — trusted code-signing certificates all cost
+money (Apple Developer ID $99/yr; Windows OV/EV certs or Azure Trusted
+Signing). The only free option is [SignPath Foundation](https://signpath.org/foundation)
+(Windows, for OSS), which requires an application. macOS has no free path.
 
-- **macOS** is already wired — add the 6 `APPLE_*` secrets (Apple Developer ID
-  certificate + notarization) and the next release signs + notarizes.
-- **Windows** depends on the certificate source (Azure Trusted Signing,
-  SignPath, or a PFX/USB-token cert); each is configured differently.
-
-Full steps (obtaining certs, the exact secret names, verifying the signature)
-are in [`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md).
+Users see an "unknown developer" warning on first launch (Windows SmartScreen,
+macOS Gatekeeper), bypassable with one extra click. See
+[`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md) for the full
+picture and how to enable signing later.
 
 ## Local verification
 

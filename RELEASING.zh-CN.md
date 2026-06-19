@@ -31,12 +31,9 @@ git push origin v0.1.0
 
 ## 代码签名
 
-工作流是**条件式签名**：填了对应 GitHub Secrets 就自动签名，没填照常出未签名包（不影响构建）。
+安装包**当前未签名（有意为之）**——可信代码签名证书都要付费（Apple Developer ID $99/年；Windows OV/EV 或 Azure Trusted Signing）。唯一免费途径是 [SignPath Foundation](https://signpath.org/foundation)（Windows、面向开源，需申请）；macOS 无免费途径。
 
-- **macOS 已接好** —— 加 6 个 `APPLE_*` secret（Apple Developer ID 证书 + 公证），下次发版自动签名+公证。
-- **Windows** 取决于证书来源（Azure Trusted Signing / SignPath / PFX 或 USB token 证书），三种接法不同。
-
-完整步骤（如何拿证书、确切的 secret 名、验证签名是否生效）见 [`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md)。
+用户首次打开会有"未知开发者"提示，多点一下即可绕过。详见 [`docs/code-signing.zh-CN.md`](docs/code-signing.zh-CN.md)。
 
 ## 本地预检
 
