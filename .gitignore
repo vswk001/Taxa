@@ -27,6 +27,9 @@ dist-ssr
 /target/
 src-tauri/target/
 
+# Logo design scratch (WIP, not shipped)
+branding/
+
 # OS
 Thumbs.db
 Desktop.ini
