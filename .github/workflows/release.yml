@@ -67,9 +67,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Builds are unsigned. Trusted code signing requires paid certificates
-          # (Apple Developer ID $99/yr; Windows OV/EV or Azure Trusted Signing).
-          # The only free option is SignPath Foundation (Windows, OSS) — see
-          # docs/code-signing.zh-CN.md. Not pursued by default.
+          # (Apple Developer ID $99/yr; Windows OV/EV or Azure Trusted Signing);
+          # the free option is SignPath Foundation (Windows, OSS). Not pursued.
         with:
           tagName: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           releaseName: "Taxis ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
