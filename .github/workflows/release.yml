@@ -85,6 +85,9 @@ jobs:
     permissions:
       contents: write
     needs: publish
+    # Run even if a publish platform flaked (e.g. the macOS DMG step is
+    # intermittently flaky) so the MCP binaries aren't stranded.
+    if: always()
     strategy:
       fail-fast: false
       matrix:
