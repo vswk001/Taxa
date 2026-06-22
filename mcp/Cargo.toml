@@ -1,17 +1,17 @@
 [package]
-name = "taxis-mcp"
-version = "0.1.2"
+name = "taxa-mcp"
+version = "0.2.0"
 edition = "2021"
-description = "Taxis MCP server — exposes the note knowledge base over stdio"
+description = "Taxa MCP server — exposes the note knowledge base over stdio"
 
 [[bin]]
-name = "taxis-mcp"
+name = "taxa-mcp"
 path = "src/main.rs"
 
 [dependencies]
-# Shares the app's storage + notebook modules. The package is `taxis`
-# (lib name `taxis_lib`); alias it so code uses `taxis_lib::`.
-taxis_lib = { package = "taxis", path = "../src-tauri" }
+# Shares the app's storage + notebook modules. The package is `taxa`
+# (lib name `taxa_lib`); alias it so code uses `taxa_lib::`.
+taxa_lib = { package = "taxa", path = "../src-tauri" }
 serde_json = "1"
 dirs = "5"
 rusqlite = "0.31"

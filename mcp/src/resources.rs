@@ -1,8 +1,8 @@
 // src-tauri/src/bin/mcp/resources.rs
-// Expose notes as addressable resources under taxis://notes/{id}.
+// Expose notes as addressable resources under taxa://notes/{id}.
 use crate::Ctx;
 use serde_json::{json, Value};
-use taxis_lib::notebook::service::NotebookService;
+use taxa_lib::notebook::service::NotebookService;
 
 /// List recent notes as resources (capped) so clients can discover/autocomplete.
 pub fn list(ctx: &Ctx) -> Value {
@@ -11,7 +11,7 @@ pub fn list(ctx: &Ctx) -> Value {
         .iter()
         .map(|n| {
             json!({
-                "uri": format!("taxis://notes/{}", n.id),
+                "uri": format!("taxa://notes/{}", n.id),
                 "name": n.title,
                 "mimeType": "text/markdown",
                 "description": n.summary,
@@ -21,15 +21,15 @@ pub fn list(ctx: &Ctx) -> Value {
     json!({ "resources": resources })
 }
 
-/// Read a resource by URI. Only `taxis://notes/{id}` is supported in v1.
+/// Read a resource by URI. Only `taxa://notes/{id}` is supported in v1.
 pub fn read(params: &Value, ctx: &Ctx) -> Result<Value, String> {
     let uri = params
         .get("uri")
         .and_then(|v| v.as_str())
         .ok_or("missing 'uri'")?;
     let id = uri
-        .strip_prefix("taxis://notes/")
-        .ok_or_else(|| format!("unsupported URI (use taxis://notes/{{id}}): {}", uri))?;
+        .strip_prefix("taxa://notes/")
+        .ok_or_else(|| format!("unsupported URI (use taxa://notes/{{id}}): {}", uri))?;
 
     let (_note, content) =
         NotebookService::get_note(&ctx.db, &ctx.md, id).map_err(|e| e.to_string())?;

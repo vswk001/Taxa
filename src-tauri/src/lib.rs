@@ -62,7 +62,7 @@ pub fn run() {
             commands::graph::get_graph_data,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Taxis");
+        .expect("error while running Taxa");
 }
 
 fn get_data_dir() -> error::AppResult<PathBuf> {

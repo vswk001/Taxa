@@ -135,7 +135,7 @@ export default {
     themeLight: '亮色',
     themeDark: '暗色',
     language: '語言',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'AI 驅動的本機筆記本',
     aboutVersion: '版本 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',

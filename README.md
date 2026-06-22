@@ -2,13 +2,13 @@
 
 <div align="center">
 
-<img src="src-tauri/icons/128x128.png" alt="Taxis" width="96" height="96">
+<img src="src-tauri/icons/128x128.png" alt="Taxa" width="96" height="96">
 
-# Taxis
+# Taxa
 
 **An AI-powered, local-first notebook for your desktop.**
 
-Capture anything — Taxis auto-categorizes, enriches, and connects it. All data stays on your device.
+Capture anything — Taxa auto-categorizes, enriches, and connects it. All data stays on your device.
 
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue)](https://tauri.app)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
@@ -20,7 +20,7 @@ Capture anything — Taxis auto-categorizes, enriches, and connects it. All data
 
 ---
 
-Taxis is a note-taking app with a built-in AI assistant. Write or paste raw text and the AI decides where it belongs — creating a new note or appending to an existing one, with a clean title, folder, and tags. It can also polish and rewrite existing notes. Bring your own LLM (Claude, OpenAI, GLM, DeepSeek, MiniMax, Kimi, or any OpenAI-compatible API), with automatic fallback between providers.
+Taxa is a note-taking app with a built-in AI assistant. Write or paste raw text and the AI decides where it belongs — creating a new note or appending to an existing one, with a clean title, folder, and tags. It can also polish and rewrite existing notes. Bring your own LLM (Claude, OpenAI, GLM, DeepSeek, MiniMax, Kimi, or any OpenAI-compatible API), with automatic fallback between providers.
 
 It also ships an **MCP server**, so tools like Claude Code and Codex can search and read your notes as a local knowledge base.
 
@@ -31,7 +31,7 @@ It also ships an **MCP server**, so tools like Claude Code and Codex can search 
 - **AI assistant with two modes**
   - *Organize* — drop in any text; the AI categorizes, titles, tags, and files it (new note or append to a related one).
   - *Polish* — optimize and rewrite an existing note on instruction.
-- **Multi-provider LLM** — configure several providers and let Taxis automatically fall back between them. Drag to set the fallback order. Streaming with reasoning shown.
+- **Multi-provider LLM** — configure several providers and let Taxa automatically fall back between them. Drag to set the fallback order. Streaming with reasoning shown.
 - **MCP knowledge base** — expose your notes as a knowledge base over the Model Context Protocol, so AI coding assistants can search and read them as context.
 - **Full-text search** — FTS5-backed search across titles, tags, and content.
 - **Note graph** — `[[wikilink]]` notes together and explore the graph.
@@ -52,8 +52,8 @@ Pre-built binaries aren't published yet. To run it yourself:
 **Steps**
 
 ```bash
-git clone https://github.com/vswk001/Taxis.git
-cd Taxis
+git clone https://github.com/vswk001/Taxa.git
+cd Taxa
 npm install
 
 npm run tauri dev      # run in development
@@ -65,13 +65,13 @@ npm run tauri build    # produce a production build
 The MCP server is a separate binary that exposes your notes to AI coding tools:
 
 ```bash
-cargo build --release --bin taxis-mcp
+cargo build --release --bin taxa-mcp
 ```
 
 Then point your client at it (Claude Code / Codex `mcpServers` config):
 
 ```jsonc
-{ "mcpServers": { "taxis": { "command": "/absolute/path/to/taxis-mcp" } } }
+{ "mcpServers": { "taxa": { "command": "/absolute/path/to/taxa-mcp" } } }
 ```
 
 See [`docs/mcp-server.md`](docs/mcp-server.md) for the full guide and the list of exposed tools.
@@ -101,7 +101,7 @@ Supported types: Claude (Anthropic), OpenAI, GLM (Zhipu), DeepSeek, MiniMax, Kim
 ## 📁 Project structure
 
 ```
-Taxis/
+Taxa/
 ├─ src/                  # Vue 3 frontend
 │  ├─ components/        # editor, AI sidebar, tree, settings
 │  ├─ stores/            # Pinia stores
@@ -133,4 +133,4 @@ cd src-tauri && cargo check --lib
 
 ## 📄 License
 
-[MIT](LICENSE) © Taxis contributors
+[MIT](LICENSE) © Taxa contributors

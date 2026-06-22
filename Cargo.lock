@@ -3826,8 +3826,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "taxis"
-version = "0.1.2"
+name = "taxa"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3852,13 +3852,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "taxis-mcp"
-version = "0.1.2"
+name = "taxa-mcp"
+version = "0.2.0"
 dependencies = [
  "dirs 5.0.1",
  "rusqlite",
  "serde_json",
- "taxis",
+ "taxa",
 ]
 
 [[package]]

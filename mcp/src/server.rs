@@ -48,7 +48,7 @@ fn initialize(params: &Value) -> Value {
             "resources": { "listChanged": false }
         },
         "serverInfo": {
-            "name": "taxis",
+            "name": "taxa",
             "version": env!("CARGO_PKG_VERSION")
         }
     })

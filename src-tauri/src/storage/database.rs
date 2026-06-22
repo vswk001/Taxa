@@ -25,7 +25,7 @@ impl Database {
     pub fn open_existing(path: &Path) -> AppResult<Self> {
         if !path.exists() {
             return Err(AppError::Database(format!(
-                "Database not found: {}. Start the Taxis app once to initialize it.",
+                "Database not found: {}. Start the Taxa app once to initialize it.",
                 path.display()
             )));
         }

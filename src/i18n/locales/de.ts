@@ -135,7 +135,7 @@ export default {
     themeLight: 'Hell',
     themeDark: 'Dunkel',
     language: 'Sprache',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'KI-gestütztes lokales Notizbuch',
     aboutVersion: 'Version 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',

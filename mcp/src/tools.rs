@@ -4,16 +4,16 @@ use crate::Ctx;
 use crate::snippet;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use taxis_lib::link::parser::LinkParser;
-use taxis_lib::notebook::service::NotebookService;
-use taxis_lib::storage::markdown::MarkdownStorage;
+use taxa_lib::link::parser::LinkParser;
+use taxa_lib::notebook::service::NotebookService;
+use taxa_lib::storage::markdown::MarkdownStorage;
 
 /// JSON Schema descriptors advertised via `tools/list`.
 pub fn list() -> Vec<Value> {
     vec![
         json!({
             "name": "search_notes",
-            "description": "Search the Taxis knowledge base by keyword. Returns matching notes (id, title, folder, path, updated_at, snippet). Use this first, then read_note for full content.",
+            "description": "Search the Taxa knowledge base by keyword. Returns matching notes (id, title, folder, path, updated_at, snippet). Use this first, then read_note for full content.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -192,7 +192,7 @@ fn backlinks(args: &Value, ctx: &Ctx) -> Result<String, String> {
 
 // ---- helpers ----
 
-fn note_summaries(notes: &[taxis_lib::notebook::model::Note]) -> Vec<Value> {
+fn note_summaries(notes: &[taxa_lib::notebook::model::Note]) -> Vec<Value> {
     notes
         .iter()
         .map(|n| {

@@ -135,7 +135,7 @@ export default {
     themeLight: 'ライト',
     themeDark: 'ダーク',
     language: '言語',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'AI搭載のローカルノートブック',
     aboutVersion: 'バージョン 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',

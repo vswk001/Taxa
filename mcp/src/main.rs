@@ -1,14 +1,14 @@
 // src-tauri/src/bin/mcp/main.rs
-// Taxis MCP server (read-only knowledge base) — entry point + stdio loop.
+// Taxa MCP server (read-only knowledge base) — entry point + stdio loop.
 //
 // Speaks JSON-RPC 2.0 over stdin/stdout, one message per line. Logging goes
 // to stderr only; stdout is reserved for the protocol. Shares the app's
-// storage + notebook modules via taxis_lib; opens the live database without
+// storage + notebook modules via taxa_lib; opens the live database without
 // running migrations and never writes.
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
-use taxis_lib::storage::database::Database;
-use taxis_lib::storage::markdown::MarkdownStorage;
+use taxa_lib::storage::database::Database;
+use taxa_lib::storage::markdown::MarkdownStorage;
 
 mod resources;
 mod server;
@@ -30,7 +30,7 @@ fn main() {
     let data_dir = match data_dir() {
         Some(d) => d,
         None => {
-            eprintln!("[taxis-mcp] cannot determine data directory");
+            eprintln!("[taxa-mcp] cannot determine data directory");
             std::process::exit(1);
         }
     };
@@ -40,7 +40,7 @@ fn main() {
     let db = match Database::open_existing(&db_path) {
         Ok(db) => db,
         Err(e) => {
-            eprintln!("[taxis-mcp] failed to open database at {}: {}", db_path.display(), e);
+            eprintln!("[taxa-mcp] failed to open database at {}: {}", db_path.display(), e);
             std::process::exit(1);
         }
     };
@@ -64,7 +64,7 @@ fn main() {
         let req = match serde_json::from_str::<serde_json::Value>(trimmed) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("[taxis-mcp] JSON parse error: {}", e);
+                eprintln!("[taxa-mcp] JSON parse error: {}", e);
                 continue;
             }
         };

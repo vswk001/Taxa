@@ -135,7 +135,7 @@ export default {
     themeLight: 'فاتح',
     themeDark: 'داكن',
     language: 'اللغة',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'دفتر ملاحظات محلي مدعوم بالذكاء الاصطناعي',
     aboutVersion: 'الإصدار 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',

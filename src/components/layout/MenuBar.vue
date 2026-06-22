@@ -1,7 +1,7 @@
 <template>
   <div class="menu-bar">
     <div class="menu-left">
-      <span class="app-title">Taxis</span>
+      <span class="app-title">Taxa</span>
       <div v-for="menu in menus" :key="menu.label" class="menu-wrapper" @mouseenter="handleMouseEnter(menu.label)">
         <button class="menu-item" @click="toggleMenu(menu.label)">
           {{ menu.label }}
@@ -108,7 +108,7 @@ const menus: Menu[] = [
   {
     label: '帮助',
     items: [
-      { label: '关于 Taxis', action: 'about' },
+      { label: '关于 Taxa', action: 'about' },
     ]
   },
 ];
@@ -167,7 +167,7 @@ function handleAction(action?: string) {
       console.log('Toggle AI');
       break;
     case 'about':
-      alert('Taxis - AI-Powered Notebook\n版本 1.0.0');
+      alert('Taxa - AI-Powered Notebook\n版本 1.0.0');
       break;
     case 'undo':
     case 'redo':

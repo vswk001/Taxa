@@ -71,7 +71,7 @@ jobs:
           # the free option is SignPath Foundation (Windows, OSS). Not pursued.
         with:
           tagName: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-          releaseName: "Taxis ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          releaseName: "Taxa ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           releaseBody: |
             Cross-platform builds for Windows, macOS, and Linux.
             Download the asset matching your platform from the list below.
@@ -79,7 +79,7 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-  # Standalone taxis-mcp binaries, uploaded to the same release. Runs after the
+  # Standalone taxa-mcp binaries, uploaded to the same release. Runs after the
   # app release exists. Native per-platform build (universal on macOS).
   mcp-binaries:
     permissions:
@@ -90,11 +90,11 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
-            artifact: taxis-mcp-linux-x86_64
+            artifact: taxa-mcp-linux-x86_64
           - platform: windows-latest
-            artifact: taxis-mcp-windows-x86_64.exe
+            artifact: taxa-mcp-windows-x86_64.exe
           - platform: macos-latest
-            artifact: taxis-mcp-macos-universal
+            artifact: taxa-mcp-macos-universal
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -114,28 +114,28 @@ jobs:
             libwebkit2gtk-4.1-dev build-essential curl wget file \
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Build taxis-mcp (Linux / Windows)
+      - name: Build taxa-mcp (Linux / Windows)
         if: matrix.platform != 'macos-latest'
-        run: cargo build --release --bin taxis-mcp
+        run: cargo build --release --bin taxa-mcp
 
-      - name: Build taxis-mcp (macOS universal)
+      - name: Build taxa-mcp (macOS universal)
         if: matrix.platform == 'macos-latest'
         run: |
-          cargo build --release --target aarch64-apple-darwin --bin taxis-mcp
-          cargo build --release --target x86_64-apple-darwin --bin taxis-mcp
-          lipo -create -output taxis-mcp \
-            target/aarch64-apple-darwin/release/taxis-mcp \
-            target/x86_64-apple-darwin/release/taxis-mcp
+          cargo build --release --target aarch64-apple-darwin --bin taxa-mcp
+          cargo build --release --target x86_64-apple-darwin --bin taxa-mcp
+          lipo -create -output taxa-mcp \
+            target/aarch64-apple-darwin/release/taxa-mcp \
+            target/x86_64-apple-darwin/release/taxa-mcp
 
       - name: Stage binary
         shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "windows-latest" ]; then
-            cp target/release/taxis-mcp.exe "${{ matrix.artifact }}"
+            cp target/release/taxa-mcp.exe "${{ matrix.artifact }}"
           elif [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            cp taxis-mcp "${{ matrix.artifact }}"
+            cp taxa-mcp "${{ matrix.artifact }}"
           else
-            cp target/release/taxis-mcp "${{ matrix.artifact }}"
+            cp target/release/taxa-mcp "${{ matrix.artifact }}"
           fi
 
       - name: Upload to release
@@ -145,6 +145,6 @@ jobs:
           TAG: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "Taxis $TAG" --generate-notes
+            gh release create "$TAG" --title "Taxa $TAG" --generate-notes
           fi
           gh release upload "$TAG" "${{ matrix.artifact }}" --clobber

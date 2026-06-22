@@ -2,13 +2,13 @@
 
 <div align="center">
 
-<img src="src-tauri/icons/128x128.png" alt="Taxis" width="96" height="96">
+<img src="src-tauri/icons/128x128.png" alt="Taxa" width="96" height="96">
 
-# Taxis
+# Taxa
 
 **AI 驱动的本地优先笔记本。**
 
-随手记录任何内容——Taxis 自动归类、完善并关联。所有数据都留在你的设备上。
+随手记录任何内容——Taxa 自动归类、完善并关联。所有数据都留在你的设备上。
 
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue)](https://tauri.app)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
@@ -20,7 +20,7 @@
 
 ---
 
-Taxis 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，AI 会判断它属于哪里——新建一篇笔记，或追加到已有相关笔记，并给出整洁的标题、目录和标签。它还能按指令润色、改写已有笔记。自带 LLM（Claude、OpenAI、GLM、DeepSeek、MiniMax、Kimi，或任何 OpenAI 兼容接口），并支持多 provider 自动 fallback。
+Taxa 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，AI 会判断它属于哪里——新建一篇笔记，或追加到已有相关笔记，并给出整洁的标题、目录和标签。它还能按指令润色、改写已有笔记。自带 LLM（Claude、OpenAI、GLM、DeepSeek、MiniMax、Kimi，或任何 OpenAI 兼容接口），并支持多 provider 自动 fallback。
 
 它还附带一个 **MCP 服务器**，让 Claude Code、Codex 等工具能搜索并读取你的笔记，作为本地知识库。
 
@@ -52,8 +52,8 @@ Taxis 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，A
 **步骤**
 
 ```bash
-git clone https://github.com/vswk001/Taxis.git
-cd Taxis
+git clone https://github.com/vswk001/Taxa.git
+cd Taxa
 npm install
 
 npm run tauri dev      # 开发模式运行
@@ -65,13 +65,13 @@ npm run tauri build    # 构建生产版本
 MCP 服务器是一个独立二进制，把你的笔记暴露给 AI 编程工具：
 
 ```bash
-cargo build --release --bin taxis-mcp
+cargo build --release --bin taxa-mcp
 ```
 
 然后在客户端（Claude Code / Codex 的 `mcpServers` 配置）中指向它：
 
 ```jsonc
-{ "mcpServers": { "taxis": { "command": "/taxis-mcp 的绝对路径" } } }
+{ "mcpServers": { "taxa": { "command": "/taxa-mcp 的绝对路径" } } }
 ```
 
 完整指南与可用工具列表见 [`docs/mcp-server.md`](docs/mcp-server.md)。
@@ -101,7 +101,7 @@ cargo build --release --bin taxis-mcp
 ## 📁 项目结构
 
 ```
-Taxis/
+Taxa/
 ├─ src/                  # Vue 3 前端
 │  ├─ components/        # 编辑器、AI 侧边栏、目录树、设置
 │  ├─ stores/            # Pinia stores
@@ -133,4 +133,4 @@ cd src-tauri && cargo check --lib
 
 ## 📄 许可证
 
-[MIT](LICENSE) © Taxis contributors
+[MIT](LICENSE) © Taxa contributors

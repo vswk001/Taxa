@@ -135,7 +135,7 @@ export default {
     themeLight: 'Light',
     themeDark: 'Dark',
     language: 'Language',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'AI-powered local notebook',
     aboutVersion: 'Version 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',

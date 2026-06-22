@@ -135,7 +135,7 @@ export default {
     themeLight: 'Claro',
     themeDark: 'Escuro',
     language: 'Idioma',
-    aboutTitle: 'Taxis',
+    aboutTitle: 'Taxa',
     aboutDesc: 'Caderno de notas local com IA',
     aboutVersion: 'Versão 1.0.0',
     aboutTech: 'Tauri v2 + Vue 3 + Rust',
