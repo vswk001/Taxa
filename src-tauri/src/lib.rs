@@ -17,6 +17,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let data_dir = get_data_dir()?;
             std::fs::create_dir_all(data_dir.join("notebooks").join("default").join("notes"))?;

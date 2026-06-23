@@ -94,6 +94,24 @@
               <div class="about-desc">{{ t('settings.aboutDesc') }}</div>
               <div class="about-version">{{ t('settings.aboutVersion') }}</div>
               <div class="about-tech">{{ t('settings.aboutTech') }}</div>
+              <div class="updater">
+                <button
+                  class="check-update-btn"
+                  :disabled="['checking','downloading','installing'].includes(updater.state.value)"
+                  @click="updater.checkForUpdates"
+                >{{ t('settings.checkUpdate') }}</button>
+                <span class="update-status">
+                  <template v-if="updater.state.value === 'checking'">{{ t('settings.updateChecking') }}</template>
+                  <template v-else-if="updater.state.value === 'uptodate'">{{ t('settings.updateUptodate') }}</template>
+                  <template v-else-if="updater.state.value === 'available'">
+                    {{ t('settings.updateAvailable', { version: updater.newVersion.value }) }}
+                    <button class="install-btn" :disabled="false" @click="updater.downloadAndInstall">{{ t('settings.updateInstall') }}</button>
+                  </template>
+                  <template v-else-if="updater.state.value === 'downloading'">{{ t('settings.updateDownloading', { p: updater.progress.value }) }}</template>
+                  <template v-else-if="updater.state.value === 'installing'">{{ t('settings.updateInstalling') }}</template>
+                  <template v-else-if="updater.state.value === 'error'">{{ t('settings.updateError') }}: {{ updater.errorMsg.value }}</template>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -118,6 +136,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { setLocale, SUPPORTED_LOCALES } from '@/i18n';
 import { useProviderDrag } from '@/composables/useProviderDrag';
+import { useUpdater } from '@/composables/useUpdater';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import LlmProviderForm from './LlmProviderForm.vue';
 
@@ -128,6 +147,7 @@ const { t } = useI18n();
 const { providers: providersRef } = storeToRefs(settingsStore);
 const { dragIndex, overIndex, onDragStart, onDragOver, onDrop, onDragEnd } =
   useProviderDrag(providersRef, (ids) => settingsStore.reorderProviders(ids));
+const updater = useUpdater();
 
 const activeTab = ref('general');
 const showForm = ref(false);
@@ -352,4 +372,10 @@ async function setDefault(id: string) {
 .about-desc { font-size: 14px; color: var(--text-secondary); margin-top: 8px; }
 .about-version { font-size: 13px; color: var(--text-secondary); margin-top: 16px; }
 .about-tech { font-size: 12px; color: var(--text-secondary); opacity: 0.7; margin-top: 4px; }
+.updater { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.check-update-btn { padding: 7px 18px; font-size: 13px; background: var(--accent-color); color: white; border: none; border-radius: 6px; cursor: pointer; }
+.check-update-btn:hover:not(:disabled) { opacity: 0.9; }
+.check-update-btn:disabled { opacity: 0.5; cursor: default; }
+.update-status { font-size: 12px; color: var(--text-secondary); }
+.update-status .install-btn { margin-left: 8px; padding: 3px 12px; font-size: 12px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; }
 </style>

@@ -66,9 +66,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Builds are unsigned. Trusted code signing requires paid certificates
-          # (Apple Developer ID $99/yr; Windows OV/EV or Azure Trusted Signing);
-          # the free option is SignPath Foundation (Windows, OSS). Not pursued.
+          # App-update signing (tauri updater). When set, tauri-action signs the
+          # update bundles and emits latest.json to the release. Add these as
+          # repo secrets; if absent the build still works, just unsigned.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           releaseName: "Taxa ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
