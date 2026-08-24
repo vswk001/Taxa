@@ -28,7 +28,11 @@ impl MarkdownStorage {
             match comp {
                 Component::Normal(part) => {
                     let s = part.to_string_lossy();
-                    if s.is_empty() || is_windows_reserved(&s) {
+                    // ':' only occurs in Windows drive prefixes ("C:/x") and
+                    // reserved stream names — reject it on every platform so
+                    // validation behaves identically everywhere (on Unix,
+                    // "C:/abs" is otherwise just a folder literally named "C:").
+                    if s.is_empty() || s.contains(':') || is_windows_reserved(&s) {
                         return Err(AppError::InvalidPath(folder.to_string()));
                     }
                 }

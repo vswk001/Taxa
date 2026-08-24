@@ -31,13 +31,14 @@ fn embed_test_manifest() {
     }
     println!("cargo:rerun-if-changed=build.rs");
 
-    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
-    if target_env == "msvc" {
-        let path = manifest_path.to_string_lossy();
-        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
-        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{path}");
-        println!("cargo:rustc-link-arg=/MANIFESTUAC:NO");
-    } else {
+    // MSVC targets: do NOT emit /MANIFEST* args here — tauri-build already
+    // embeds a manifest, and a second MANIFEST resource with the same ID
+    // fails the link with CVT1100 "duplicate resource" (seen on the windows
+    // release runner). MSVC test binaries therefore lack the Common-Controls
+    // dependency (local `cargo test` on an MSVC toolchain hits
+    // STATUS_ENTRYPOINT_NOT_FOUND from the dialog plugin); CI runs tests on
+    // Linux, and windows-gnu dev setups are covered by the windres branch.
+    if std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() != "msvc" {
         // GNU: wrap the manifest in a COFF resource object via windres.
         let rc_path = out_dir.join("taxa-test.rc");
         let obj_path = out_dir.join("taxa-test-manifest.o");
