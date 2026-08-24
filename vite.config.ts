@@ -2,15 +2,29 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "path";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+
+  build: {
+    // Tauri's webviews (WebView2 / WKWebView) are modern; ES2022 avoids
+    // transpiling syntax they natively support.
+    target: "es2022",
+    rollupOptions: {
+      output: {
+        // The editor stack is heavy; split it out of the entry chunk so the
+        // app shell paints without parsing ProseMirror + KaTeX first.
+        manualChunks: {
+          milkdown: ["@milkdown/crepe", "@milkdown/kit", "@milkdown/vue"],
+        },
+      },
     },
   },
 
@@ -35,4 +49,4 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
-}));
+});

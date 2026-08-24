@@ -10,8 +10,8 @@
       </div>
     </div>
 
-    <!-- LLM Config Panel -->
-    <div v-if="showConfig" class="config-panel">
+    <!-- LLM Config Panel; v-show keeps the chat (scroll position, state) alive -->
+    <div v-show="showConfig" class="config-panel">
       <div v-if="settingsStore.providers.length === 0 && !showForm" class="no-providers">
         <p>{{ t('ai.noProviders') }}</p>
         <p class="hint">{{ t('ai.noProvidersHint') }}</p>
@@ -47,8 +47,8 @@
     </div>
 
     <!-- Chat Area -->
-    <template v-else>
-      <ChatArea :messages="aiStore.messages" @apply="aiStore.applyResult($event)" @apply-optimize="onApplyOptimize" @dismiss="aiStore.dismiss()" />
+    <div v-show="!showConfig" class="chat-wrap">
+      <ChatArea :messages="aiStore.messages" @apply="onApply" @apply-optimize="onApplyOptimize" @dismiss="aiStore.dismiss($event)" />
       <div v-if="aiStore.isProcessing" class="processing-bar">
         <span class="processing-text">{{ t('ai.processing') }}</span>
         <button class="cancel-btn" @click="aiStore.cancel()">{{ t('ai.cancel') }}</button>
@@ -62,7 +62,7 @@
         </div>
         <ChatInput :disabled="aiStore.isProcessing" :mode="aiStore.mode" @submit="handleSubmit" />
       </div>
-    </template>
+    </div>
     <ConfirmDialog
       :visible="confirmVisible"
       :message="confirmMsg"
@@ -80,8 +80,8 @@ import { useI18n } from 'vue-i18n';
 import { useAiStore } from '@/stores/ai';
 import { useNotebookStore } from '@/stores/notebook';
 import { useSettingsStore } from '@/stores/settings';
-import { invoke } from '@tauri-apps/api/core';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import type { LlmProvider, LlmProviderForm as LlmProviderFormType } from '@/types/settings';
 import { useProviderDrag } from '@/composables/useProviderDrag';
 import ChatArea from './ChatArea.vue';
 import ChatInput from './ChatInput.vue';
@@ -97,7 +97,7 @@ const { dragIndex, overIndex, onDragStart, onDragOver, onDrop, onDragEnd } =
   useProviderDrag(providersRef, (ids) => settingsStore.reorderProviders(ids));
 const showConfig = ref(false);
 const showForm = ref(false);
-const editingProvider = ref<any>(null);
+const editingProvider = ref<LlmProvider | null>(null);
 const confirmVisible = ref(false);
 const confirmMsg = ref('');
 const confirmResolve = ref<((v: boolean) => void) | null>(null);
@@ -110,7 +110,15 @@ function showConfirm(msg: string): Promise<boolean> {
   });
 }
 
-function handleSubmit(content: string, attachments: any[]) {
+function onApply(payload: { result: import('@/types/ai-extended').OrganizeResult; msgId: string }) {
+  aiStore.applyResult(payload.result, payload.msgId);
+}
+
+function onApplyOptimize(payload: { noteId: string; title: string; content: string; msgId: string }) {
+  aiStore.applyOptimize(payload.noteId, payload.title, payload.content, payload.msgId);
+}
+
+function handleSubmit(content: string, attachments: import('@/types/ai').FileAttachment[]) {
   if (aiStore.mode === 'optimize') {
     const note = notebookStore.currentNote;
     if (!note) {
@@ -129,28 +137,28 @@ function handleSubmit(content: string, attachments: any[]) {
   }
 }
 
-function onApplyOptimize(noteId: string, title: string, content: string) {
-  aiStore.applyOptimize(noteId, title, content);
-}
-
-onMounted(() => { settingsStore.loadProviders(); });
-
-async function handleSave(form: any) {
-  try {
-    await settingsStore.saveProvider(form);
-    showForm.value = false;
-    editingProvider.value = null;
-  } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: t('ai.saveFailed'), kind: 'error' });
-  }
-}
-
 function openAddForm() {
   editingProvider.value = null;
   showForm.value = true;
 }
 
-function handleEdit(p: any) {
+onMounted(() => { settingsStore.loadProviders(); });
+
+async function handleSave(form: LlmProviderFormType & { id?: string }) {
+  try {
+    await settingsStore.saveProvider(form);
+    showForm.value = false;
+    editingProvider.value = null;
+  } catch (e: unknown) {
+    await tauriMessage(extractErr(e).message, { title: t('ai.saveFailed'), kind: 'error' });
+  }
+}
+
+function extractErr(e: unknown): Error {
+  return e instanceof Error ? e : new Error(String(e));
+}
+
+function handleEdit(p: LlmProvider) {
   editingProvider.value = { ...p };
   showForm.value = true;
 }
@@ -158,23 +166,16 @@ function handleEdit(p: any) {
 async function handleDelete(id: string) {
   const yes = await showConfirm(t('ai.deleteProviderConfirm'));
   if (yes) {
-    try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
+    try { await settingsStore.deleteProvider(id); } catch (e: unknown) { await tauriMessage(extractErr(e).message, { title: t('ai.deleteFailed'), kind: 'error' }); }
   }
 }
 
 async function setDefault(id: string) {
   try {
-    const provider = settingsStore.providers.find(p => p.id === id);
-    if (!provider) return;
-    await invoke('save_provider', { config: { ...provider, is_default: true, api_key: '' } });
-    for (const p of settingsStore.providers) {
-      if (p.id !== id && p.is_default) {
-        await invoke('save_provider', { config: { ...p, is_default: false, api_key: '' } });
-      }
-    }
-    await settingsStore.loadProviders();
-  } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: t('ai.setDefaultFailed'), kind: 'error' });
+    // Single store call: the backend unsets other defaults in one transaction.
+    await settingsStore.setDefault(id);
+  } catch (e: unknown) {
+    await tauriMessage(extractErr(e).message, { title: t('ai.setDefaultFailed'), kind: 'error' });
   }
 }
 </script>
@@ -209,6 +210,9 @@ async function setDefault(id: string) {
 
 .config-panel {
   flex: 1; overflow-y: auto; padding: 12px;
+}
+.chat-wrap {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
 }
 .no-providers { text-align: center; color: var(--text-secondary); padding: 20px; }
 .no-providers .hint { font-size: 12px; margin-top: 4px; opacity: 0.7; }

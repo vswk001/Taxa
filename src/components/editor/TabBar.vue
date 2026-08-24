@@ -37,13 +37,18 @@ async function handleNewNote() {
   }
 }
 
-function handleCloseTab(tabId: string) {
+async function handleCloseTab(tabId: string) {
+  const wasActive = editorStore.activeTabId === tabId;
   editorStore.closeTab(tabId);
 
-  if (editorStore.activeTabId && editorStore.activeTabId !== '__graph__') {
-    notebookStore.openNote(editorStore.activeTabId);
-  } else if (!editorStore.activeTabId) {
-    notebookStore.currentNote = null;
+  // Only refetch when the closed tab was the active one — closing a
+  // background tab must not clobber the visible note's unsaved edits.
+  if (wasActive) {
+    if (editorStore.activeTabId && editorStore.activeTabId !== '__graph__') {
+      await notebookStore.openNote(editorStore.activeTabId);
+    } else if (!editorStore.activeTabId) {
+      notebookStore.currentNote = null;
+    }
   }
 }
 </script>

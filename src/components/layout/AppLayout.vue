@@ -20,8 +20,9 @@
         </div>
       </div>
 
-      <!-- Left sidebar -->
-      <NoteTree v-if="sidebarVisible" />
+      <!-- Left sidebar; v-show keeps tree expansion state and avoids a full
+           reload every toggle -->
+      <NoteTree v-show="sidebarVisible" />
 
       <div class="center-panel">
         <TabBar />
@@ -77,6 +78,12 @@ function openGraphTab() {
 }
 
 function handleKeyboard(e: KeyboardEvent) {
+  // Skip when typing in the editor/inputs so editor shortcuts (Ctrl+B for
+  // bold, etc.) don't also toggle panels.
+  const target = e.target as HTMLElement | null;
+  if (target?.isContentEditable || target?.closest('.ProseMirror, input, textarea, [contenteditable]')) {
+    return;
+  }
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.key === 'k') { e.preventDefault(); showSearch.value = !showSearch.value; }
   if (ctrl && e.key === 'g') { e.preventDefault(); openGraphTab(); }
@@ -85,7 +92,6 @@ function handleKeyboard(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyboard);
-  notebookStore.loadFolderTree();
 });
 onUnmounted(() => document.removeEventListener('keydown', handleKeyboard));
 </script>

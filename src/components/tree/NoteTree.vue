@@ -17,7 +17,7 @@
     </div>
 
     <div class="tree-content">
-      <div v-if="notebookStore.folders.length === 0" class="empty-state">
+      <div v-if="loaded && notebookStore.folders.length === 0" class="empty-state">
         <p>{{ t('tree.noFolders') }}</p>
         <button class="create-first-btn" @click="handleNewFolder">{{ t('tree.createFirst') }}</button>
       </div>
@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue';
+import { onMounted, onBeforeUnmount, computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
@@ -101,6 +101,8 @@ const editorStore = useEditorStore();
 const expandVersion = ref(0);
 const expandTarget = ref(false);
 const isAllExpanded = ref(false);
+/** Guards the empty-state so it doesn't flash before the first load. */
+const loaded = ref(false);
 
 function toggleExpandAll() {
   isAllExpanded.value = !isAllExpanded.value;
@@ -178,18 +180,23 @@ const noteMap = computed(() => {
 });
 
 onMounted(async () => {
-  await notebookStore.loadFolderTree();
-  await loadAllNotes();
-});
-
-async function loadAllNotes() {
   try {
-    for (const folder of notebookStore.folders) {
-      await notebookStore.loadNotes(folder.path);
-    }
+    await notebookStore.loadFolderTree();
+    // Recursive load via the store (covers subfolders too — the previous
+    // local version only walked top-level folders, so nested notes never
+    // appeared anywhere).
+    await notebookStore.loadAllNotes();
   } catch (e) {
     console.error('Failed to load notes:', e);
+  } finally {
+    loaded.value = true;
   }
+});
+
+/** Refresh after mutations; replaces the old local top-level-only loader. */
+async function refreshAll() {
+  await notebookStore.loadFolderTree();
+  await notebookStore.loadAllNotes();
 }
 
 async function handleFolderSelect(path: string) {
@@ -220,7 +227,7 @@ async function handleNewNote() {
     const note = await notebookStore.createNote(folder, title, '');
     if (note) {
       editorStore.openTab(note.id, note.title);
-      await loadAllNotes();
+      await refreshAll();
     }
   } catch (e: any) {
     console.error('Failed to create note:', e);
@@ -265,7 +272,7 @@ async function handleMenuAction(action: string) {
         const note = await notebookStore.createNote(folder.path, title, '');
         if (note) {
           editorStore.openTab(note.id, note.title);
-          await loadAllNotes();
+          await refreshAll();
         }
       }
     } else if (action === 'new-subfolder' && 'path' in target) {
@@ -281,7 +288,7 @@ async function handleMenuAction(action: string) {
       if (newName && newName !== folder.name) {
         await notebookStore.renameFolder(folder.path, newName);
         await notebookStore.loadFolderTree();
-        await loadAllNotes();
+        await refreshAll();
       }
     } else if (action === 'delete' && 'path' in target && 'name' in target) {
       const folder = target as Folder;
@@ -290,14 +297,14 @@ async function handleMenuAction(action: string) {
         await notebookStore.deleteFolder(folder.path);
         notebookStore.currentFolder = '';
         await notebookStore.loadFolderTree();
-        await loadAllNotes();
+        await refreshAll();
       }
     } else if (action === 'rename-note' && 'id' in target) {
       const note = target as Note;
       const newTitle = await showInputDialog({ title: t('tree.renameNoteTitle'), placeholder: t('tree.renameNotePlaceholder'), defaultValue: note.title });
       if (newTitle && newTitle !== note.title) {
         await notebookStore.renameNote(note.id, newTitle);
-        await loadAllNotes();
+        await refreshAll();
         await notebookStore.loadFolderTree();
       }
     } else if (action === 'move-note' && 'id' in target) {
@@ -307,7 +314,7 @@ async function handleMenuAction(action: string) {
       const targetFolder = await showInputDialog({ title: t('tree.moveNoteTitle'), placeholder: folderPaths });
       if (targetFolder) {
         await notebookStore.moveNote(note.id, targetFolder);
-        await loadAllNotes();
+        await refreshAll();
         await notebookStore.loadFolderTree();
       }
     } else if (action === 'delete-note' && 'id' in target) {
@@ -322,7 +329,7 @@ async function handleMenuAction(action: string) {
       const result = await invoke<{ title: string; content: string } | null>('import_note');
       if (result) {
         const note = await notebookStore.createNote(folder.path, result.title, result.content);
-        if (note) { editorStore.openTab(note.id, note.title); await loadAllNotes(); }
+        if (note) { editorStore.openTab(note.id, note.title); await refreshAll(); }
       }
     } else if (action === 'import-folder' && 'path' in target) {
       const folder = target as Folder;
@@ -331,7 +338,7 @@ async function handleMenuAction(action: string) {
         for (const n of result.notes) {
           await notebookStore.createNote(folder.path, n.title, n.content);
         }
-        await loadAllNotes();
+        await refreshAll();
         await notebookStore.loadFolderTree();
       }
     } else if (action === 'export-folder' && 'path' in target) {
@@ -354,6 +361,26 @@ async function handleMenuAction(action: string) {
 function handleGlobalClick() {
   if (contextMenu.value.show) contextMenu.value.show = false;
 }
+
+// Close the fixed-position context menu on any click outside the tree or on
+// Escape (previously only clicks inside the tree closed it).
+function onDocPointerDown() {
+  if (contextMenu.value.show) contextMenu.value.show = false;
+}
+
+function onDocKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && contextMenu.value.show) contextMenu.value.show = false;
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown, true);
+  document.addEventListener('keydown', onDocKeyDown, true);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown, true);
+  document.removeEventListener('keydown', onDocKeyDown, true);
+});
 </script>
 
 <style scoped>

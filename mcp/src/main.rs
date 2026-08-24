@@ -1,4 +1,4 @@
-// src-tauri/src/bin/mcp/main.rs
+// mcp/src/main.rs
 // Taxa MCP server (read-only knowledge base) — entry point + stdio loop.
 //
 // Speaks JSON-RPC 2.0 over stdin/stdout, one message per line. Logging goes
@@ -21,9 +21,19 @@ pub struct Ctx {
     pub md: MarkdownStorage,
 }
 
-/// Resolve the data dir exactly as the Tauri app does.
+/// Resolve the data dir exactly as the Tauri app does, including the legacy
+/// "Taxis" name fallback used before the rename.
 fn data_dir() -> Option<PathBuf> {
-    Some(dirs::data_dir()?.join("Taxis"))
+    let base = dirs::data_dir()?;
+    let dir = base.join("Taxa");
+    if dir.exists() {
+        return Some(dir);
+    }
+    let legacy = base.join("Taxis");
+    if legacy.exists() {
+        return Some(legacy);
+    }
+    Some(dir)
 }
 
 fn main() {
@@ -34,13 +44,28 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let db_path = data_dir.join("taxis.db");
+    let db_path = data_dir.join("taxa.db");
+    // Fall back to the legacy file name if the app has not migrated yet.
+    let db_path = if db_path.exists() {
+        db_path
+    } else {
+        let legacy = data_dir.join("taxis.db");
+        if legacy.exists() {
+            legacy
+        } else {
+            db_path
+        }
+    };
     let notes_dir = data_dir.join("notebooks").join("default").join("notes");
 
     let db = match Database::open_existing(&db_path) {
         Ok(db) => db,
         Err(e) => {
-            eprintln!("[taxa-mcp] failed to open database at {}: {}", db_path.display(), e);
+            eprintln!(
+                "[taxa-mcp] failed to open database at {}: {}",
+                db_path.display(),
+                e
+            );
             std::process::exit(1);
         }
     };

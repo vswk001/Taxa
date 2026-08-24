@@ -87,16 +87,16 @@ cargo build --release --bin taxa-mcp
 
 ## 🧱 技术栈
 
-| 层 | 技术 |
-|----|------|
-| 桌面外壳 | Tauri v2 |
-| 前端 | Vue 3 + TypeScript + Vite + Pinia |
-| 编辑器 | Milkdown (ProseMirror) |
-| 后端 | Rust |
-| 存储 | SQLite (rusqlite, FTS5) + Markdown 文件 |
-| 国际化 | vue-i18n |
-| AI 传输 | 基于 Tauri 事件的流式 |
-| 外部接口 | 基于 stdio 的 MCP |
+| 层     | 技术                                    |
+| ----- | ------------------------------------- |
+| 桌面外壳  | Tauri v2                              |
+| 前端    | Vue 3 + TypeScript + Vite + Pinia     |
+| 编辑器   | Milkdown (ProseMirror)                |
+| 后端    | Rust                                  |
+| 存储    | SQLite (rusqlite, FTS5) + Markdown 文件 |
+| 国际化   | vue-i18n                              |
+| AI 传输 | 基于 Tauri 事件的流式                        |
+| 外部接口  | 基于 stdio 的 MCP                        |
 
 ## 📁 项目结构
 
@@ -124,12 +124,16 @@ Taxa/
 欢迎提 Issue 和 Pull Request。较大改动请先开 Issue 讨论你想修改的内容。
 
 ```bash
-# 前端类型检查
+# 前端类型检查 + 构建
 npx vue-tsc --noEmit
+npx vite build
 
-# 后端检查
-cd src-tauri && cargo check --lib
+# 后端检查、Lint 与测试
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
+
+CI 会在每个 Pull Request 上运行相同的检查（见 `.github/workflows/ci.yml`）。
 
 ## 📄 许可证
 

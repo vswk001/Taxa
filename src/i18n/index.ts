@@ -9,10 +9,16 @@ import ja from './locales/ja';
 import fr from './locales/fr';
 import de from './locales/de';
 
-const saved = localStorage.getItem('taxis-locale');
+const STORAGE_KEY = 'taxa-locale';
+// One-time migration from the legacy pre-rename key.
+if (!localStorage.getItem(STORAGE_KEY) && localStorage.getItem('taxis-locale')) {
+  localStorage.setItem(STORAGE_KEY, localStorage.getItem('taxis-locale') as string);
+}
+
+const saved = localStorage.getItem(STORAGE_KEY);
 const browserLang = navigator.language;
 
-let initialLocale = saved || 'zh-CN';
+let initialLocale = saved || 'en';
 if (!saved) {
   const map: Record<string, string> = {
     'zh': 'zh-CN', 'zh-CN': 'zh-CN', 'zh-Hans': 'zh-CN', 'zh-Hans-CN': 'zh-CN',
@@ -25,13 +31,14 @@ if (!saved) {
     'fr': 'fr', 'fr-FR': 'fr',
     'de': 'de', 'de-DE': 'de',
   };
-  initialLocale = map[browserLang] || 'zh-CN';
+  // Unmapped locales fall back to English, not Chinese.
+  initialLocale = map[browserLang] || 'en';
 }
 
 const i18n = createI18n({
   legacy: false,
   locale: initialLocale,
-  fallbackLocale: 'zh-CN',
+  fallbackLocale: 'en',
   messages: {
     'zh-CN': zhCN,
     'zh-TW': zhTW,
@@ -47,14 +54,23 @@ const i18n = createI18n({
 
 export const RTL_LANGUAGES = ['ar'];
 
-export function setLocale(lang: string) {
-  i18n.global.locale.value = lang as any;
-  localStorage.setItem('taxis-locale', lang);
+/** Set document direction + lang so RTL layouts survive restarts (previously
+ *  only applied when the user switched languages at runtime). */
+function applyDocumentLocale(lang: string) {
+  document.documentElement.lang = lang;
   if (RTL_LANGUAGES.includes(lang)) {
     document.documentElement.setAttribute('dir', 'rtl');
   } else {
-    document.documentElement.removeAttribute('dir');
+    document.documentElement.setAttribute('dir', 'ltr');
   }
+}
+
+applyDocumentLocale(initialLocale);
+
+export function setLocale(lang: string) {
+  i18n.global.locale.value = lang as any;
+  localStorage.setItem(STORAGE_KEY, lang);
+  applyDocumentLocale(lang);
 }
 
 export const SUPPORTED_LOCALES = [

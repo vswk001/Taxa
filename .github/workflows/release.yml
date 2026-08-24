@@ -7,7 +7,12 @@ name: Release
 # Tauri apps can't be cross-compiled from one OS — each platform needs its own
 # toolchain + native webview — so this runs on three OS runners in parallel.
 # Builds are unsigned; users may see an "unidentified developer" warning until
-# signing certificates are configured (see notes in docs/mcp-server.md area).
+# signing certificates are configured.
+#
+# The in-app updater requires TAURI_PRIVATE_KEY / TAURI_KEY_PASSWORD repo
+# secrets (the bundler fails without them because an updater pubkey is
+# configured). Releases are published non-draft so `releases/latest` (the
+# updater endpoint) resolves immediately.
 
 on:
   workflow_dispatch:
@@ -20,6 +25,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     permissions:
@@ -31,28 +40,49 @@ jobs:
           # macOS: one universal binary covering Apple Silicon + Intel.
           - platform: macos-latest
             args: '--target universal-apple-darwin'
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             args: ''
           - platform: windows-latest
             args: ''
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Verify updater signing secrets
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_PRIVATE_KEY secret is missing. The updater pubkey in tauri.conf.json makes the bundler require the private key — add TAURI_PRIVATE_KEY and TAURI_KEY_PASSWORD as repo secrets."
+            exit 1
+          fi
+
+      # On manual dispatch, build the exact commit the tag points at — the
+      # workflow's branch ref might differ from the tag.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c  # dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c  # Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+          key: ${{ matrix.platform }}
 
       - name: Add macOS targets (universal binary)
         if: matrix.platform == 'macos-latest'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -63,12 +93,11 @@ jobs:
         run: npm ci
 
       - name: Build and publish
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@fce9c6108b31ea247710505d3aaaa893ee6768d4  # tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # App-update signing (tauri updater). When set, tauri-action signs the
-          # update bundles and emits latest.json to the release. Add these as
-          # repo secrets; if absent the build still works, just unsigned.
+          # App-update signing (tauri updater): signs the update bundles and
+          # emits latest.json to the release (required, see preflight above).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
@@ -77,7 +106,10 @@ jobs:
           releaseBody: |
             Cross-platform builds for Windows, macOS, and Linux.
             Download the asset matching your platform from the list below.
-          releaseDraft: true
+          # Non-draft: the updater endpoint is releases/latest, which never
+          # resolves to a draft — publishing a draft manually would leave
+          # in-app updates 404ing until then.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
@@ -94,7 +126,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             artifact: taxa-mcp-linux-x86_64
           - platform: windows-latest
             artifact: taxa-mcp-windows-x86_64.exe
@@ -102,17 +134,25 @@ jobs:
             artifact: taxa-mcp-macos-universal
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c  # dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c  # Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+          key: mcp-${{ matrix.platform }}
 
       - name: Add macOS targets (universal binary)
         if: matrix.platform == 'macos-latest'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \

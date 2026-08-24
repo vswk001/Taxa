@@ -1,7 +1,7 @@
 // src/stores/notebook.ts
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Note, Folder, NoteWithContent, SearchResult } from '@/types/notebook';
+import type { Note, Folder, NoteWithContent, SearchResult, UpdateNoteRequest } from '@/types/notebook';
 import { notebookApi } from '@/composables/useTauriCommand';
 
 export const useNotebookStore = defineStore('notebook', () => {
@@ -39,19 +39,17 @@ export const useNotebookStore = defineStore('notebook', () => {
         notes.value.push(note);
       }
     }
-    currentFolder.value = folder;
   }
 
   async function loadAllNotes() {
-    const allNotes: Note[] = [];
     const allFolders = flattenFolders(folders.value);
-    for (const folder of allFolders) {
-      try {
-        const folderNotes = await notebookApi.listNotes(folder.path);
-        allNotes.push(...folderNotes);
-      } catch (e) {
-        console.error(`Failed to load notes from ${folder.path}:`, e);
-      }
+    // Parallel loads: one list_notes per folder at once instead of serially.
+    const results = await Promise.allSettled(
+      allFolders.map(folder => notebookApi.listNotes(folder.path)),
+    );
+    const allNotes: Note[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') allNotes.push(...r.value);
     }
     notes.value = allNotes;
   }
@@ -65,8 +63,32 @@ export const useNotebookStore = defineStore('notebook', () => {
     return result;
   }
 
+  // --- pending-save flush -------------------------------------------------
+  // NoteEditor registers a flusher so any note switch first persists the
+  // previous note's debounced edits instead of silently dropping them.
+  let pendingFlush: (() => Promise<void>) | null = null;
+
+  function registerPendingSave(fn: (() => Promise<void>) | null) {
+    pendingFlush = fn;
+  }
+
+  async function flushPendingSave() {
+    const flush = pendingFlush;
+    pendingFlush = null;
+    if (flush) await flush();
+  }
+
+  // --- note opening with request sequencing -------------------------------
+  let openSeq = 0;
+
+  /** Open a note. Flushes the previous note's pending edits first and
+   *  discards out-of-order responses from rapid switching. */
   async function openNote(id: string) {
-    currentNote.value = await notebookApi.getNote(id);
+    const seq = ++openSeq;
+    await flushPendingSave();
+    const result = await notebookApi.getNote(id);
+    if (seq !== openSeq) return; // a newer openNote superseded this one
+    currentNote.value = result;
   }
 
   async function createNote(folder: string, title: string, content: string, tags?: string[]) {
@@ -77,18 +99,9 @@ export const useNotebookStore = defineStore('notebook', () => {
     return note;
   }
 
+  /** Update content of a note by id, whether or not it is the open note. */
   async function updateNoteContent(id: string, content: string, title?: string) {
-    if (!currentNote.value) return;
     const updated = await notebookApi.updateNote({ id, content, title });
-    currentNote.value = { note: updated, content };
-    const idx = notes.value.findIndex(n => n.id === id);
-    if (idx >= 0) notes.value[idx] = updated;
-    return updated;
-  }
-
-  async function updateNoteTags(id: string, tags: string[]) {
-    const content = currentNote.value?.note.id === id ? currentNote.value.content : '';
-    const updated = await notebookApi.updateNote({ id, content, tags });
     const idx = notes.value.findIndex(n => n.id === id);
     if (idx >= 0) notes.value[idx] = updated;
     if (currentNote.value?.note.id === id) {
@@ -97,9 +110,30 @@ export const useNotebookStore = defineStore('notebook', () => {
     return updated;
   }
 
+  async function updateNoteTags(id: string, tags: string[]) {
+    // Only send content when this is the open note (we have fresh content);
+    // otherwise omit the field — the backend treats missing content as
+    // "don't touch the file". Sending '' here used to wipe note files.
+    const req: UpdateNoteRequest = { id, tags };
+    if (currentNote.value?.note.id === id) {
+      req.content = currentNote.value.content;
+    }
+    const updated = await notebookApi.updateNote(req);
+    const idx = notes.value.findIndex(n => n.id === id);
+    if (idx >= 0) notes.value[idx] = updated;
+    if (currentNote.value?.note.id === id) {
+      currentNote.value = { note: updated, content: currentNote.value.content };
+    }
+    return updated;
+  }
+
   async function renameNote(id: string, newTitle: string) {
-    const content = currentNote.value?.note.id === id ? currentNote.value.content : '';
-    const updated = await notebookApi.updateNote({ id, title: newTitle, content });
+    // Same rule as updateNoteTags: never send content for a non-open note.
+    const req: UpdateNoteRequest = { id, title: newTitle };
+    if (currentNote.value?.note.id === id) {
+      req.content = currentNote.value.content;
+    }
+    const updated = await notebookApi.updateNote(req);
     const idx = notes.value.findIndex(n => n.id === id);
     if (idx >= 0) notes.value[idx] = updated;
     if (currentNote.value?.note.id === id) {
@@ -127,25 +161,38 @@ export const useNotebookStore = defineStore('notebook', () => {
     await loadFolderTree();
   }
 
+  async function createFolder(parent: string, name: string) {
+    const path = await notebookApi.createFolder(parent, name);
+    await loadFolderTree();
+    return path;
+  }
+
+  async function renameFolder(path: string, newName: string) {
+    const newPath = await notebookApi.renameFolder(path, newName);
+    await loadFolderTree();
+    await loadAllNotes();
+    return newPath;
+  }
+
+  async function deleteFolder(path: string) {
+    await notebookApi.deleteFolder(path);
+    await loadFolderTree();
+    await loadAllNotes();
+  }
+
+  // --- search with response sequencing -------------------------------------
+  let searchSeq = 0;
+
   async function search(query: string, scope?: string) {
     searchQuery.value = query;
     if (!query.trim()) {
       searchResults.value = [];
       return;
     }
-    searchResults.value = await notebookApi.searchNotes(query, scope);
-  }
-
-  async function createFolder(parent: string, name: string) {
-    return await notebookApi.createFolder(parent, name);
-  }
-
-  async function renameFolder(path: string, newName: string) {
-    return await notebookApi.renameFolder(path, newName);
-  }
-
-  async function deleteFolder(path: string) {
-    return await notebookApi.deleteFolder(path);
+    const seq = ++searchSeq;
+    const results = await notebookApi.searchNotes(query, scope);
+    if (seq !== searchSeq) return; // a newer search superseded this one
+    searchResults.value = results;
   }
 
   return {
@@ -153,6 +200,6 @@ export const useNotebookStore = defineStore('notebook', () => {
     viewMode, selectedFolderForList, folderNotes,
     currentNotes, loadFolderTree, loadNotes, loadAllNotes, openNote, createNote,
     updateNoteContent, updateNoteTags, deleteNote, search, createFolder, renameFolder, deleteFolder,
-    renameNote, moveNote,
+    renameNote, moveNote, registerPendingSave, flushPendingSave,
   };
 });

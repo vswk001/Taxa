@@ -1,10 +1,9 @@
-// src-tauri/src/bin/mcp/tools.rs
+// mcp/src/tools.rs
 // Tool metadata + handlers. All operations are read-only.
-use crate::Ctx;
 use crate::snippet;
+use crate::Ctx;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use taxa_lib::link::parser::LinkParser;
 use taxa_lib::notebook::service::NotebookService;
 use taxa_lib::storage::markdown::MarkdownStorage;
 
@@ -93,7 +92,9 @@ fn search_notes(args: &Value, ctx: &Ctx) -> Result<String, String> {
     // Empty query: degrade to recent notes (still useful to the AI).
     if query.trim().is_empty() {
         let notes = NotebookService::list_recent_notes(&ctx.db, 20).map_err(|e| e.to_string())?;
-        return Ok(pretty(&json!({ "results": note_summaries(&notes), "count": notes.len() })));
+        return Ok(pretty(
+            &json!({ "results": note_summaries(&notes), "count": notes.len() }),
+        ));
     }
 
     let scope = args.get("scope").and_then(|v| v.as_str()).unwrap_or("all");
@@ -103,7 +104,8 @@ fn search_notes(args: &Value, ctx: &Ctx) -> Result<String, String> {
         .unwrap_or(20)
         .min(50) as usize;
 
-    let results = NotebookService::search_notes(&ctx.db, query, scope).map_err(|e| e.to_string())?;
+    let results =
+        NotebookService::search_notes(&ctx.db, query, scope).map_err(|e| e.to_string())?;
     let ids: Vec<&str> = results.iter().map(|r| r.id.as_str()).collect();
     let meta = query_meta(ctx, &ids)?; // id -> (folder, updated_at)
 
@@ -131,7 +133,8 @@ fn read_note(args: &Value, ctx: &Ctx) -> Result<String, String> {
         .get("id")
         .and_then(|v| v.as_str())
         .ok_or("missing required argument 'id'")?;
-    let (note, content) = NotebookService::get_note(&ctx.db, &ctx.md, id).map_err(|e| e.to_string())?;
+    let (note, content) =
+        NotebookService::get_note(&ctx.db, &ctx.md, id).map_err(|e| e.to_string())?;
     let v = json!({
         "id": note.id,
         "title": note.title,
@@ -152,7 +155,9 @@ fn list_notes(args: &Value, ctx: &Ctx) -> Result<String, String> {
         Some(f) => NotebookService::list_notes(&ctx.db, &ctx.md, f).map_err(|e| e.to_string())?,
         None => NotebookService::list_recent_notes(&ctx.db, 50).map_err(|e| e.to_string())?,
     };
-    Ok(pretty(&json!({ "notes": note_summaries(&notes), "count": notes.len() })))
+    Ok(pretty(
+        &json!({ "notes": note_summaries(&notes), "count": notes.len() }),
+    ))
 }
 
 fn folder_tree(ctx: &Ctx) -> Result<String, String> {
@@ -160,8 +165,9 @@ fn folder_tree(ctx: &Ctx) -> Result<String, String> {
     Ok(pretty(&json!({ "folders": tree })))
 }
 
-/// Pure read: scan note content for `[[title]]` wikilinks. No DB writes
-/// (unlike build_graph, which mutates the links table).
+/// Answer from the app-maintained `links` table (kept fresh on every note
+/// write and reconciled at app startup) — one indexed query instead of
+/// reading the entire vault from disk.
 fn backlinks(args: &Value, ctx: &Ctx) -> Result<String, String> {
     let title = args
         .get("title")
@@ -170,22 +176,26 @@ fn backlinks(args: &Value, ctx: &Ctx) -> Result<String, String> {
 
     let conn = ctx.db.conn();
     let mut stmt = conn
-        .prepare("SELECT id, path, title, folder FROM notes")
+        .prepare(
+            "SELECT n.id, n.title, n.folder FROM notes n \
+             JOIN links l ON l.source_note_id = n.id \
+             WHERE l.target_note_id = (SELECT id FROM notes WHERE title = ?1 ORDER BY created_at LIMIT 1)",
+        )
         .map_err(|e| e.to_string())?;
-    let rows: Vec<(String, String, String, String)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
+    let rows = stmt
+        .query_map([title], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })
         .map_err(|e| e.to_string())?;
 
     let mut out: Vec<Value> = Vec::new();
-    for (id, path, note_title, folder) in rows {
-        if let Ok(content) = ctx.md.read_note(&path) {
-            let links = LinkParser::extract_links(&content);
-            if links.iter().any(|l| l == title) {
-                out.push(json!({ "id": id, "title": note_title, "folder": folder }));
-            }
-        }
+    for row in rows {
+        let (id, note_title, folder) = row.map_err(|e| e.to_string())?;
+        out.push(json!({ "id": id, "title": note_title, "folder": folder }));
     }
     Ok(pretty(&json!({ "backlinks": out, "count": out.len() })))
 }
@@ -220,11 +230,17 @@ fn query_meta(ctx: &Ctx, ids: &[&str]) -> Result<HashMap<String, (String, String
     );
     let conn = ctx.db.conn();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let params: Vec<&dyn rusqlite::types::ToSql> =
-        ids.iter().map(|s| s as &dyn rusqlite::types::ToSql).collect();
+    let params: Vec<&dyn rusqlite::types::ToSql> = ids
+        .iter()
+        .map(|s| s as &dyn rusqlite::types::ToSql)
+        .collect();
     let rows = stmt
         .query_map(params.as_slice(), |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
     for row in rows {

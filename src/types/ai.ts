@@ -36,3 +36,10 @@ export interface ChatMessage {
   /** Set when the engine fell back to another provider (failed -> next). */
   fallbackInfo?: { failed: string; next: string };
 }
+
+/** Mirrors the Rust StreamEvent enum (serde tag="type", content="text"). */
+export type StreamEventPayload =
+  | { type: 'Reasoning'; text: string }
+  | { type: 'Content'; text: string }
+  | { type: 'Fallback'; text: { failed: string; next: string } }
+  | { type: 'Reset'; text: null };

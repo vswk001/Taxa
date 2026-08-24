@@ -92,7 +92,7 @@
             <div class="about-content">
               <div class="about-title">{{ t('settings.aboutTitle') }}</div>
               <div class="about-desc">{{ t('settings.aboutDesc') }}</div>
-              <div class="about-version">{{ t('settings.aboutVersion') }}</div>
+              <div class="about-version">{{ t('settings.aboutVersion', { version: appVersion }) }}</div>
               <div class="about-tech">{{ t('settings.aboutTech') }}</div>
               <div class="updater">
                 <button
@@ -132,9 +132,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/stores/settings';
-import { invoke } from '@tauri-apps/api/core';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { setLocale, SUPPORTED_LOCALES } from '@/i18n';
+import { getVersion } from '@tauri-apps/api/app';
+import { useTheme } from '@/composables/useTheme';
+import type { LlmProvider } from '@/types/settings';
 import { useProviderDrag } from '@/composables/useProviderDrag';
 import { useUpdater } from '@/composables/useUpdater';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
@@ -148,12 +150,24 @@ const { providers: providersRef } = storeToRefs(settingsStore);
 const { dragIndex, overIndex, onDragStart, onDragOver, onDrop, onDragEnd } =
   useProviderDrag(providersRef, (ids) => settingsStore.reorderProviders(ids));
 const updater = useUpdater();
+const { setTheme } = useTheme();
+
+// Real app version from the Tauri bundle (previously hard-coded in each
+// locale file and already drifting from the actual release).
+const appVersion = ref('');
+onMounted(async () => {
+  try {
+    appVersion.value = await getVersion();
+  } catch {
+    appVersion.value = '0.2.0';
+  }
+});
 
 const activeTab = ref('general');
 const showForm = ref(false);
-const editingProvider = ref<any>(null);
+const editingProvider = ref<LlmProvider | null>(null);
 const localTheme = ref<'light' | 'dark' | 'system'>(settingsStore.theme);
-const localLang = ref((localStorage.getItem('taxis-locale') || 'zh-CN'));
+const localLang = ref((localStorage.getItem('taxa-locale') || 'en'));
 const supportedLocales = SUPPORTED_LOCALES;
 const confirmVisible = ref(false);
 const confirmMsg = ref('');
@@ -183,7 +197,7 @@ onMounted(() => { settingsStore.loadProviders(); });
 watch(() => props.visible, (v) => {
   if (v) {
     localTheme.value = settingsStore.theme;
-    localLang.value = localStorage.getItem('taxis-locale') || 'zh-CN';
+    localLang.value = localStorage.getItem('taxa-locale') || 'en';
     showForm.value = false;
     editingProvider.value = null;
     settingsStore.loadProviders();
@@ -191,29 +205,20 @@ watch(() => props.visible, (v) => {
 });
 
 function handleThemeChange() {
-  const theme = localTheme.value;
-  if (theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else if (theme === 'light') {
-    document.documentElement.removeAttribute('data-theme');
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark) document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-  }
+  setTheme(localTheme.value);
 }
 
 function handleLangChange() {
   setLocale(localLang.value);
 }
 
-async function handleSave(form: any) {
+async function handleSave(form: import('@/types/settings').LlmProviderForm & { id?: string }) {
   try {
     await settingsStore.saveProvider(form);
     showForm.value = false;
     editingProvider.value = null;
-  } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: t('ai.saveFailed'), kind: 'error' });
+  } catch (e: unknown) {
+    await tauriMessage(e instanceof Error ? e.message : String(e), { title: t('ai.saveFailed'), kind: 'error' });
   }
 }
 
@@ -222,7 +227,7 @@ function openAddForm() {
   showForm.value = true;
 }
 
-function handleEdit(p: any) {
+function handleEdit(p: LlmProvider) {
   editingProvider.value = { ...p };
   showForm.value = true;
 }
@@ -230,23 +235,15 @@ function handleEdit(p: any) {
 async function handleDelete(id: string) {
   const yes = await showConfirm(t('ai.deleteProviderConfirm'));
   if (yes) {
-    try { await settingsStore.deleteProvider(id); } catch (e: any) { await tauriMessage(e.message || String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
+    try { await settingsStore.deleteProvider(id); } catch (e: unknown) { await tauriMessage(e instanceof Error ? e.message : String(e), { title: t('ai.deleteFailed'), kind: 'error' }); }
   }
 }
 
 async function setDefault(id: string) {
   try {
-    const provider = settingsStore.providers.find(p => p.id === id);
-    if (!provider) return;
-    await invoke('save_provider', { config: { ...provider, is_default: true, api_key: '' } });
-    for (const p of settingsStore.providers) {
-      if (p.id !== id && p.is_default) {
-        await invoke('save_provider', { config: { ...p, is_default: false, api_key: '' } });
-      }
-    }
-    await settingsStore.loadProviders();
-  } catch (e: any) {
-    await tauriMessage(e.message || String(e), { title: t('ai.setDefaultFailed'), kind: 'error' });
+    await settingsStore.setDefault(id);
+  } catch (e: unknown) {
+    await tauriMessage(e instanceof Error ? e.message : String(e), { title: t('ai.setDefaultFailed'), kind: 'error' });
   }
 }
 </script>

@@ -124,12 +124,16 @@ The UI is translated into 9 languages. Switch under **Settings → General → L
 Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss what you'd like to change.
 
 ```bash
-# frontend type-check
+# frontend type-check + build
 npx vue-tsc --noEmit
+npx vite build
 
-# backend check
-cd src-tauri && cargo check --lib
+# backend check, lints, and tests
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
+
+CI runs the same checks on every pull request (see `.github/workflows/ci.yml`).
 
 ## 📄 License
 

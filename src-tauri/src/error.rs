@@ -1,7 +1,7 @@
 // src-tauri/src/error.rs
 use serde::Serialize;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AppError {
     #[error("Database error: {0}")]
     Database(String),
@@ -13,6 +13,18 @@ pub enum AppError {
     AiEngine(String),
     #[error("LLM provider error: {0}")]
     LlmProvider(String),
+    /// HTTP 429 from the provider — retryable.
+    #[error("LLM provider rate limited: {0}")]
+    RateLimited(String),
+    /// HTTP 5xx from the provider — retryable.
+    #[error("LLM provider server error: {0}")]
+    LlmServer(String),
+    /// The user cancelled the operation.
+    #[error("已取消")]
+    Cancelled(String),
+    /// A caller-supplied path escaped the notes vault.
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
     #[error("Configuration error: {0}")]
     Config(String),
     #[error("Keyring error: {0}")]
@@ -47,5 +59,13 @@ impl From<std::io::Error> for AppError {
 impl From<serde_json::Error> for AppError {
     fn from(e: serde_json::Error) -> Self {
         AppError::Serialization(e.to_string())
+    }
+}
+
+impl AppError {
+    /// True when the error is transient (rate limit / 5xx / network) and a
+    /// same-provider retry is reasonable.
+    pub fn is_transient(&self) -> bool {
+        matches!(self, AppError::RateLimited(_) | AppError::LlmServer(_))
     }
 }

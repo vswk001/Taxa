@@ -1,4 +1,4 @@
-// src-tauri/src/bin/mcp/server.rs
+// mcp/src/server.rs
 // JSON-RPC 2.0 dispatch for the MCP server.
 use crate::Ctx;
 use serde_json::{json, Value};
@@ -17,8 +17,9 @@ pub fn handle(req: &Value, ctx: &Ctx) -> Option<Value> {
         "tools/list" => Ok(json!({ "tools": super::tools::list() })),
         "tools/call" => Ok(super::tools::call(&params, ctx)),
         "resources/list" => Ok(super::resources::list(ctx)),
-        "resources/read" => super::resources::read(&params, ctx)
-            .map_err(|msg| rpc_error(-32602, &msg)),
+        "resources/read" => {
+            super::resources::read(&params, ctx).map_err(|(code, msg)| rpc_error(code, &msg))
+        }
         _ => Err(rpc_error(-32601, &format!("Method not found: {}", method))),
     };
 
@@ -34,15 +35,22 @@ fn rpc_error(code: i64, message: &str) -> Value {
     json!({ "code": code, "message": message })
 }
 
+/// MCP protocol versions this server understands. Anything else falls back to
+/// the baseline instead of blindly echoing an unknown version.
+const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2024-11-05", "2025-03-26", "2025-06-18"];
+
 fn initialize(params: &Value) -> Value {
-    // Echo the client's requested protocol version for broad compatibility;
-    // fall back to the widely-supported baseline.
-    let client_version = params
+    let requested = params
         .get("protocolVersion")
         .and_then(|v| v.as_str())
         .unwrap_or("2024-11-05");
+    let negotiated = if SUPPORTED_PROTOCOL_VERSIONS.contains(&requested) {
+        requested
+    } else {
+        "2024-11-05"
+    };
     json!({
-        "protocolVersion": client_version,
+        "protocolVersion": negotiated,
         "capabilities": {
             "tools": { "listChanged": false },
             "resources": { "listChanged": false }

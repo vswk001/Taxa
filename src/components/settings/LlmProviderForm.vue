@@ -50,11 +50,13 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { LlmProviderForm } from '@/types/settings';
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, DEFAULT_PROVIDER_URLS, DEFAULT_PROVIDER_MODELS } from '@/stores/settings';
 
 const { t } = useI18n();
 
-const props = defineProps<{ initialData?: LlmProviderForm & { id?: string } }>();
+// Partial: when editing, the stored provider has no api_key (keys stay
+// server-side) — the form simply starts with an empty key field.
+const props = defineProps<{ initialData?: Partial<LlmProviderForm> & { id?: string } | null }>();
 const emit = defineEmits<{ save: [form: LlmProviderForm & { id?: string }]; cancel: [] }>();
 const settingsStore = useSettingsStore();
 const testing = ref(false);
@@ -70,17 +72,8 @@ const form = ref<LlmProviderForm>({
   is_default: props.initialData?.is_default ?? false,
 });
 
-const urlPlaceholder = computed(() => {
-  switch (form.value.provider_type) {
-    case 'claude': return 'https://api.anthropic.com';
-    case 'openai': return 'https://api.openai.com';
-    case 'glm': return 'https://open.bigmodel.cn/api/paas/v4';
-    case 'deepseek': return 'https://api.deepseek.com';
-    case 'minimax': return 'https://api.minimax.chat/v1';
-    case 'kimi': return 'https://api.moonshot.cn/v1';
-    default: return 'https://api.example.com/v1';
-  }
-});
+// Shared with the settings store so both stay in sync.
+const urlPlaceholder = computed(() => DEFAULT_PROVIDER_URLS[form.value.provider_type] || DEFAULT_PROVIDER_URLS.custom);
 
 const urlHint = computed(() => {
   switch (form.value.provider_type) {
@@ -93,26 +86,11 @@ const urlHint = computed(() => {
   }
 });
 
-const modelPlaceholder = computed(() => {
-  switch (form.value.provider_type) {
-    case 'claude': return 'claude-sonnet-4-6';
-    case 'openai': return 'gpt-4o';
-    case 'glm': return 'glm-4';
-    case 'deepseek': return 'deepseek-chat';
-    case 'minimax': return 'MiniMax-Text-01';
-    case 'kimi': return 'moonshot-v1-8k';
-    default: return 'model-name';
-  }
-});
+const modelPlaceholder = computed(() => DEFAULT_PROVIDER_MODELS[form.value.provider_type] || DEFAULT_PROVIDER_MODELS.custom);
 
-function updateDefaults() {
-  if (!form.value.api_url) {
-    form.value.api_url = '';
-  }
-  if (!form.value.model_name) {
-    form.value.model_name = '';
-  }
-}
+// Empty fields are filled with the provider's defaults on save (see the
+// settings store); nothing to mutate here on type switch.
+function updateDefaults() {}
 
 async function testConnection() {
   testing.value = true;

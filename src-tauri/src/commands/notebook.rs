@@ -1,88 +1,140 @@
 // src-tauri/src/commands/notebook.rs
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::notebook::model::*;
 use crate::notebook::service::NotebookService;
-use crate::state::AppState;
-use crate::storage::markdown::MarkdownStorage;
+use crate::state::{lock_db, AppState};
+use crate::storage::markdown::{sanitize_filename, MarkdownStorage};
+use std::sync::Arc;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
+// Commands are async and run their blocking work (file I/O + SQLite) on the
+// blocking thread pool via spawn_blocking, keeping the main thread free for
+// the webview. All DB access goes through short-lived lock_db scopes that are
+// dropped before any .await.
+
 #[tauri::command]
-pub fn create_note(state: State<AppState>, req: CreateNoteRequest) -> AppResult<Note> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::create_note(&db, &md, req)
+pub async fn create_note(
+    state: State<'_, Arc<AppState>>,
+    req: CreateNoteRequest,
+) -> AppResult<Note> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::create_note(&db, &md, req)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn get_note(state: State<AppState>, id: String) -> AppResult<NoteWithContent> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    let (note, content) = NotebookService::get_note(&db, &md, &id)?;
-    Ok(NoteWithContent { note, content })
+pub async fn get_note(state: State<'_, Arc<AppState>>, id: String) -> AppResult<NoteWithContent> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        let (note, content) = NotebookService::get_note(&db, &md, &id)?;
+        Ok(NoteWithContent { note, content })
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn update_note(state: State<AppState>, req: UpdateNoteRequest) -> AppResult<Note> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::update_note(&db, &md, req)
+pub async fn update_note(
+    state: State<'_, Arc<AppState>>,
+    req: UpdateNoteRequest,
+) -> AppResult<Note> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::update_note(&db, &md, req)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn delete_note(state: State<AppState>, id: String) -> AppResult<()> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::delete_note(&db, &md, &id)
+pub async fn delete_note(state: State<'_, Arc<AppState>>, id: String) -> AppResult<()> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::delete_note(&db, &md, &id)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn move_note(state: State<AppState>, req: MoveNoteRequest) -> AppResult<Note> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::move_note(&db, &md, req)
+pub async fn move_note(state: State<'_, Arc<AppState>>, req: MoveNoteRequest) -> AppResult<Note> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::move_note(&db, &md, req)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_notes(state: State<AppState>, folder: String) -> AppResult<Vec<Note>> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::list_notes(&db, &md, &folder)
+pub async fn list_notes(state: State<'_, Arc<AppState>>, folder: String) -> AppResult<Vec<Note>> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::list_notes(&db, &md, &folder)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn get_folder_tree(state: State<AppState>) -> AppResult<Vec<Folder>> {
-    let md = MarkdownStorage::new(state.notes_dir());
-    NotebookService::get_folder_tree(&md)
+pub async fn get_folder_tree(state: State<'_, Arc<AppState>>) -> AppResult<Vec<Folder>> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::get_folder_tree(&md)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn search_notes(state: State<AppState>, query: String, scope: Option<String>) -> AppResult<Vec<SearchResult>> {
-    let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-    let md = MarkdownStorage::new(state.notes_dir());
-    let s = scope.as_deref().unwrap_or("all");
-    let mut results = NotebookService::search_notes(&db, &query, s)?;
-    // Filter out phantom notes (file missing on disk)
-    results.retain(|r| md.full_path(&r.path).exists());
-    Ok(results)
+pub async fn create_folder(
+    state: State<'_, Arc<AppState>>,
+    parent: String,
+    name: String,
+) -> AppResult<String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let md = MarkdownStorage::new(state.notes_dir());
+        md.create_folder(&parent, &name)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn create_folder(state: State<AppState>, parent: String, name: String) -> AppResult<String> {
-    let md = MarkdownStorage::new(state.notes_dir());
-    md.create_folder(&parent, &name)
+pub async fn rename_folder(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+    new_name: String,
+) -> AppResult<String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        // Disk rename + DB row updates stay in sync.
+        NotebookService::rename_folder(&db, &md, &path, &new_name)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn rename_folder(state: State<AppState>, path: String, new_name: String) -> AppResult<String> {
-    let md = MarkdownStorage::new(state.notes_dir());
-    md.rename_folder(&path, &new_name)
-}
-
-#[tauri::command]
-pub fn delete_folder(state: State<AppState>, path: String) -> AppResult<()> {
-    let md = MarkdownStorage::new(state.notes_dir());
-    md.delete_folder(&path)
+pub async fn delete_folder(state: State<'_, Arc<AppState>>, path: String) -> AppResult<()> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::delete_folder(&db, &md, &path)
+    })
+    .await
 }
 
 #[derive(serde::Serialize)]
@@ -91,46 +143,92 @@ pub struct NoteWithContent {
     pub content: String,
 }
 
-#[tauri::command]
-pub fn import_note(app: AppHandle) -> AppResult<Option<serde_json::Value>> {
-    let path = app.dialog()
-        .file()
-        .set_title("导入笔记")
-        .add_filter("Markdown", &["md", "txt"])
-        .blocking_pick_file();
+// Dialog commands: the plugin's async callback API bridged with a oneshot
+// channel — never block the event loop with blocking_pick_*.
 
-    match path {
-        Some(p) => {
-            let path = file_path_to_pathbuf(&p)?;
-            let content = std::fs::read_to_string(&path)?;
-            let title = path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("导入笔记")
-                .to_string();
-            Ok(Some(serde_json::json!({ "title": title, "content": content })))
-        }
-        None => Ok(None),
-    }
+async fn pick_file(
+    app: &AppHandle,
+    title: &str,
+    filter_name: &str,
+    extensions: &[&str],
+) -> AppResult<Option<FilePath>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title(title)
+        .add_filter(filter_name, extensions)
+        .pick_file(move |path| {
+            let _ = tx.send(path);
+        });
+    rx.await
+        .map_err(|_| AppError::Config("Dialog failed".into()))
+}
+
+async fn pick_folder(app: &AppHandle, title: &str) -> AppResult<Option<FilePath>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title(title)
+        .pick_folder(move |path| {
+            let _ = tx.send(path);
+        });
+    rx.await
+        .map_err(|_| AppError::Config("Dialog failed".into()))
+}
+
+async fn save_file(
+    app: &AppHandle,
+    title: &str,
+    filter_name: &str,
+    extensions: &[&str],
+    file_name: &str,
+) -> AppResult<Option<FilePath>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title(title)
+        .add_filter(filter_name, extensions)
+        .set_file_name(file_name)
+        .save_file(move |path| {
+            let _ = tx.send(path);
+        });
+    rx.await
+        .map_err(|_| AppError::Config("Dialog failed".into()))
 }
 
 #[tauri::command]
-pub fn export_note(app: AppHandle, title: String, content: String) -> AppResult<bool> {
-    let file_name = format!("{}.md", title);
-    let path = app.dialog()
-        .file()
-        .set_title("导出笔记")
-        .add_filter("Markdown", &["md"])
-        .set_file_name(&file_name)
-        .blocking_save_file();
+pub async fn import_note(app: AppHandle) -> AppResult<Option<serde_json::Value>> {
+    let path = match pick_file(&app, "导入笔记", "Markdown", &["md", "txt"]).await? {
+        Some(p) => file_path_to_pathbuf(&p)?,
+        None => return Ok(None),
+    };
+    let content = {
+        let path = path.clone();
+        tokio::task::spawn_blocking(move || std::fs::read_to_string(&path))
+            .await
+            .map_err(|e| AppError::FileIo(e.to_string()))??
+    };
+    let title = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("导入笔记")
+        .to_string();
+    Ok(Some(
+        serde_json::json!({ "title": title, "content": content }),
+    ))
+}
 
-    match path {
-        Some(p) => {
-            let path = file_path_to_pathbuf(&p)?;
-            std::fs::write(&path, &content)?;
-            Ok(true)
-        }
-        None => Ok(false),
-    }
+#[tauri::command]
+pub async fn export_note(app: AppHandle, title: String, content: String) -> AppResult<bool> {
+    let file_name = format!("{}.md", sanitize_filename(&title));
+    let path = match save_file(&app, "导出笔记", "Markdown", &["md"], &file_name).await? {
+        Some(p) => file_path_to_pathbuf(&p)?,
+        None => return Ok(false),
+    };
+    tokio::task::spawn_blocking(move || std::fs::write(&path, &content))
+        .await
+        .map_err(|e| AppError::FileIo(e.to_string()))??;
+    Ok(true)
 }
 
 #[derive(serde::Serialize)]
@@ -146,46 +244,46 @@ pub struct ImportFolderResult {
 }
 
 #[tauri::command]
-pub fn import_folder(app: AppHandle) -> AppResult<Option<ImportFolderResult>> {
-    let path = app.dialog()
-        .file()
-        .set_title("打开目录")
-        .blocking_pick_folder();
+pub async fn import_folder(app: AppHandle) -> AppResult<Option<ImportFolderResult>> {
+    let dir = match pick_folder(&app, "打开目录").await? {
+        Some(p) => file_path_to_pathbuf(&p)?,
+        None => return Ok(None),
+    };
+    let folder_name = dir
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("导入目录")
+        .to_string();
 
-    match path {
-        Some(p) => {
-            let dir = file_path_to_pathbuf(&p)?;
-            let folder_name = dir.file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("导入目录")
-                .to_string();
+    let notes = tokio::task::spawn_blocking(move || {
+        let mut notes = Vec::new();
+        import_dir_recursive(&dir, &mut notes)?;
+        Ok::<_, AppError>(notes)
+    })
+    .await
+    .map_err(|e| AppError::FileIo(e.to_string()))??;
 
-            let mut notes = Vec::new();
-            import_dir_recursive(&dir, &mut notes)?;
-
-            Ok(Some(ImportFolderResult {
-                folder: folder_name,
-                notes,
-            }))
-        }
-        None => Ok(None),
-    }
+    Ok(Some(ImportFolderResult {
+        folder: folder_name,
+        notes,
+    }))
 }
 
 fn import_dir_recursive(dir: &std::path::Path, notes: &mut Vec<ImportedNote>) -> AppResult<()> {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                import_dir_recursive(&path, notes)?;
-            } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let title = path.file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("导入笔记")
-                        .to_string();
-                    notes.push(ImportedNote { title, content });
-                }
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        // Never follow symlinks: a cycle would recurse forever.
+        if path.is_dir() && !path.is_symlink() {
+            import_dir_recursive(&path, notes)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let title = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("导入笔记")
+                    .to_string();
+                notes.push(ImportedNote { title, content });
             }
         }
     }
@@ -193,37 +291,51 @@ fn import_dir_recursive(dir: &std::path::Path, notes: &mut Vec<ImportedNote>) ->
 }
 
 #[tauri::command]
-pub fn export_folder(state: State<AppState>, app: AppHandle, folder: String) -> AppResult<bool> {
-    let path = app.dialog()
-        .file()
-        .set_title("导出目录")
-        .blocking_pick_folder();
+pub async fn export_folder(
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+    folder: String,
+) -> AppResult<bool> {
+    let export_dir_root = match pick_folder(&app, "导出目录").await? {
+        Some(p) => file_path_to_pathbuf(&p)?,
+        None => return Ok(false),
+    };
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let export_dir = export_dir_root.join(sanitize_filename(&folder));
+        std::fs::create_dir_all(&export_dir)?;
 
-    match path {
-        Some(p) => {
-            let export_dir = file_path_to_pathbuf(&p)?.join(&folder);
-            std::fs::create_dir_all(&export_dir)?;
-
-            let db = state.db.lock().map_err(|e| crate::error::AppError::Database(e.to_string()))?;
-            let md = MarkdownStorage::new(state.notes_dir());
-
-            let notes = NotebookService::list_notes(&db, &md, &folder)?;
-            for note in &notes {
-                if let Ok(content) = md.read_note(&note.path) {
-                    let file_name = format!("{}.md", note.title);
-                    std::fs::write(export_dir.join(&file_name), &content)?;
-                }
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        let notes = NotebookService::list_notes(&db, &md, &folder)?;
+        for note in &notes {
+            if let Ok(content) = md.read_note(&note.path) {
+                let file_name = format!("{}.md", sanitize_filename(&note.title));
+                std::fs::write(export_dir.join(&file_name), &content)?;
             }
-            Ok(true)
         }
-        None => Ok(false),
-    }
+        Ok(true)
+    })
+    .await
 }
 
 fn file_path_to_pathbuf(fp: &FilePath) -> AppResult<std::path::PathBuf> {
     match fp {
         FilePath::Path(p) => Ok(p.clone()),
-        FilePath::Url(url) => url.to_file_path()
-            .map_err(|_| crate::error::AppError::Config("Invalid file URL".into())),
+        FilePath::Url(url) => url
+            .to_file_path()
+            .map_err(|_| AppError::Config("Invalid file URL".into())),
     }
+}
+
+/// Run a blocking closure on the blocking thread pool and flatten the join
+/// result into AppResult.
+pub(crate) async fn run_blocking<T, F>(f: F) -> AppResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> AppResult<T> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| AppError::AiEngine(format!("Background task failed: {}", e)))?
 }

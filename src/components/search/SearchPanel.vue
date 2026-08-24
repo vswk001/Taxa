@@ -24,7 +24,8 @@
         <div v-if="r.snippet" class="result-snippet" v-html="r.snippet"></div>
         <div class="result-path">{{ r.path }}</div>
       </div>
-      <div v-if="query && !debouncing && notebookStore.searchResults.length === 0" class="no-results">{{ t('search.noResults') }}</div>
+      <div v-if="searchError" class="no-results">{{ searchError }}</div>
+      <div v-else-if="query && !debouncing && !searching && notebookStore.searchResults.length === 0" class="no-results">{{ t('search.noResults') }}</div>
     </div>
 
     <!-- Scope dropdown (rendered outside panel via Teleport) -->
@@ -91,14 +92,27 @@ function updateDropdownPos() {
   dropdownPos.value = { top: rect.bottom + 4, left: rect.left };
 }
 
-let debounceTimer: ReturnType<typeof setTimeout>;
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+/** Transient error text (backend failures were previously swallowed). */
+const searchError = ref('');
+const searching = ref(false);
+
+function runSearch() {
+  searching.value = true;
+  notebookStore.search(query.value, scope.value === 'all' ? undefined : scope.value)
+    .catch((e: unknown) => {
+      searchError.value = String((e as Error)?.message || e);
+    })
+    .finally(() => { searching.value = false; });
+}
 
 function handleSearch() {
   clearTimeout(debounceTimer);
+  searchError.value = '';
   debouncing.value = true;
   debounceTimer = setTimeout(() => {
     debouncing.value = false;
-    notebookStore.search(query.value, scope.value === 'all' ? undefined : scope.value);
+    runSearch();
   }, 300);
 }
 
@@ -113,14 +127,16 @@ function selectScope(value: string) {
   scope.value = value;
   scopeOpen.value = false;
   if (query.value) {
-    notebookStore.search(query.value, value === 'all' ? undefined : value);
+    runSearch();
   }
 }
+
+let blurTimer: ReturnType<typeof setTimeout> | undefined;
 
 function onInputBlur() {
   showScopeHint.value = false;
   // Close scope dropdown with delay to allow click events to fire
-  setTimeout(() => { scopeOpen.value = false; }, 150);
+  blurTimer = setTimeout(() => { scopeOpen.value = false; }, 150);
 }
 
 async function openResult(id: string) {
@@ -137,7 +153,10 @@ watch(() => inputRef.value, (el) => {
   if (el) nextTick(() => el.focus());
 });
 
-onBeforeUnmount(() => clearTimeout(debounceTimer));
+onBeforeUnmount(() => {
+  clearTimeout(debounceTimer);
+  clearTimeout(blurTimer);
+});
 </script>
 
 <style scoped>

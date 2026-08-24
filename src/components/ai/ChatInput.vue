@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
@@ -100,6 +100,11 @@ function handlePaste(e: ClipboardEvent) {
     }
   }
 }
+
+// Attachments have no effect in optimize mode — don't keep them around.
+watch(() => props.mode, (m) => {
+  if (m === 'optimize') attachments.value = [];
+});
 
 function submit() {
   if (!text.value.trim() && !attachments.value.length) return;

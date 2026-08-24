@@ -27,13 +27,14 @@ pub fn language_directive(locale: &str) -> String {
 }
 
 impl PromptTemplates {
-    pub fn categorize(raw_content: &str, folder_structure: &str, related_notes: &str, locale: &str) -> Vec<Message> {
+    pub fn categorize(
+        raw_content: &str,
+        folder_structure: &str,
+        related_notes: &str,
+        locale: &str,
+    ) -> Vec<Message> {
         // Sanitize: remove null bytes, limit content length
-        let content: String = raw_content
-            .replace('\0', "")
-            .chars()
-            .take(80000)
-            .collect();
+        let content: String = raw_content.replace('\0', "").chars().take(80000).collect();
         vec![
             Message {
                 role: "system".into(),
@@ -74,6 +75,9 @@ impl PromptTemplates {
     }
 
     pub fn enrich(title: &str, content: &str, locale: &str) -> Vec<Message> {
+        // Same size cap as the other prompts so an oversized note cannot blow
+        // up the request.
+        let content_clean: String = content.replace('\0', "").chars().take(80000).collect();
         vec![
             Message {
                 role: "system".into(),
@@ -90,7 +94,7 @@ impl PromptTemplates {
             },
             Message {
                 role: "user".into(),
-                content: format!("标题：{}\n\n内容：\n{}", title, content),
+                content: format!("标题：{}\n\n内容：\n{}", title, content_clean),
             },
         ]
     }

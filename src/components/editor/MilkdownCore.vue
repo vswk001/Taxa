@@ -17,8 +17,15 @@ const { t } = useI18n();
 const props = defineProps<{ modelValue: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 
-let ignoreNextUpdate = false;
+// Programmatic-set echo suppression: instead of a time-based flag (which
+// swallowed keystrokes within its window), the first markdownUpdated after a
+// programmatic set is ignored only when it echoes the value we applied.
+let applyingSetValue = false;
+let lastAppliedValue = props.modelValue;
 let currentMarkdown = props.modelValue;
+// Values arriving while the editor is still initializing are queued and
+// applied once it is ready (previously they were silently dropped).
+let pendingValue: string | null = null;
 
 useEditor((container) => {
   const crepe = new Crepe({
@@ -41,7 +48,8 @@ useEditor((container) => {
 
   crepe.on((listeners) => {
     listeners.markdownUpdated((_, markdown) => {
-      if (ignoreNextUpdate) return;
+      if (applyingSetValue && markdown === lastAppliedValue) return; // our own echo
+      applyingSetValue = false;
       currentMarkdown = markdown;
       emit('update:modelValue', markdown);
     });
@@ -52,12 +60,14 @@ useEditor((container) => {
 
 const [loading, getInstance] = useInstance();
 
-watch(() => props.modelValue, (newValue) => {
-  if (newValue === currentMarkdown) return;
+function applyValue(newValue: string) {
   const editor = getInstance();
-  if (!editor || loading.value) return;
-
-  ignoreNextUpdate = true;
+  if (!editor) {
+    pendingValue = newValue;
+    return;
+  }
+  applyingSetValue = true;
+  lastAppliedValue = newValue;
   try {
     editor.action((ctx) => {
       const view = ctx.get(editorViewCtx);
@@ -77,7 +87,23 @@ watch(() => props.modelValue, (newValue) => {
     });
   } finally {
     currentMarkdown = newValue;
-    setTimeout(() => { ignoreNextUpdate = false; }, 50);
+  }
+}
+
+watch(() => props.modelValue, (newValue) => {
+  if (newValue === currentMarkdown) return;
+  if (loading.value) {
+    pendingValue = newValue;
+    return;
+  }
+  applyValue(newValue);
+});
+
+watch(loading, (isLoading) => {
+  if (!isLoading && pendingValue !== null && pendingValue !== currentMarkdown) {
+    const value = pendingValue;
+    pendingValue = null;
+    applyValue(value);
   }
 });
 

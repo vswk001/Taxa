@@ -1,7 +1,7 @@
 // src/stores/ai.ts
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { ChatMessage, FileAttachment } from '@/types/ai';
+import type { ChatMessage, FileAttachment, StreamEventPayload } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -31,9 +31,14 @@ function extractError(e: unknown): string {
   return t('common.unknownError');
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+/** Race the promise against a timeout; when the timeout wins, tell the
+ *  backend to actually abort the request (it honors ai_cancel). */
+function withTimeout<T>(promise: Promise<T>, ms: number, seq: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(t('ai.requestTimeout', { n: ms / 1000 }))), ms);
+    const timer = setTimeout(() => {
+      invoke('ai_cancel', { seq }).catch(() => { /* best effort */ });
+      reject(new Error(t('ai.requestTimeout', { n: ms / 1000 })));
+    }, ms);
     promise.then(
       (val) => { clearTimeout(timer); resolve(val); },
       (err) => { clearTimeout(timer); reject(err); },
@@ -47,7 +52,16 @@ export const useAiStore = defineStore('ai', () => {
   const lastResult = ref<OrganizeResult | null>(null);
   const mode = ref<'organize' | 'optimize'>('organize');
   let requestSeq = 0;
-  let streamUnlisten: UnlistenFn | null = null;
+
+  /** Subscribe to backend stream events for one request. The unlisten handle
+   *  is request-local, so a finished/timed-out request can never unhook a
+   *  newer request's listener. */
+  async function listenStream(seq: number, onEvent: (evt: StreamEventPayload) => void): Promise<UnlistenFn> {
+    return listen<{ seq: number; event: StreamEventPayload }>('ai-stream', (e) => {
+      if (e.payload.seq !== seq) return;
+      onEvent(e.payload.event);
+    });
+  }
 
   async function submitInput(content: string, attachments?: FileAttachment[]) {
     const seq = ++requestSeq;
@@ -65,7 +79,7 @@ export const useAiStore = defineStore('ai', () => {
     // Prepend file contents to the AI input
     let fullContent = content;
     if (attachments?.length) {
-      const fileParts = attachments.map(a => `--- 文件: ${a.name} ---\n${a.content}`).join('\n\n');
+      const fileParts = attachments.map(a => `--- ${t('ai.fileLabel')}: ${a.name} ---\n${a.content}`).join('\n\n');
       fullContent = fileParts + '\n\n' + content;
     }
 
@@ -82,36 +96,31 @@ export const useAiStore = defineStore('ai', () => {
     // Helper: get reactive proxy for the AI message (raw local var bypasses Vue)
     const getMsg = () => messages.value.find(m => m.id === aiMsgId);
 
-    // Listen for real-time streaming events from the backend
-    if (streamUnlisten) {
-      streamUnlisten();
-      streamUnlisten = null;
-    }
-    streamUnlisten = await listen<{ seq: number; event: { type: string; text: any } }>('ai-stream', (evt) => {
-      if (evt.payload.seq !== seq) return;
+    const unlisten = await listenStream(seq, ({ type, text }) => {
       const msg = getMsg();
-      if (!msg) return;
-
-      const { type, text } = evt.payload.event;
+      if (!msg || msg.status === 'error') return;
       if (type === 'Reasoning') {
         if (!msg.reasoning) msg.reasoning = '';
-        msg.reasoning += text;
+        msg.reasoning += text as string;
         // Show "thinking" instead of static placeholder while reasoning streams in
         if (msg.content === t('ai.analyzing')) {
           msg.content = t('ai.thinkingStatus');
         }
+      } else if (type === 'Reset') {
+        // The provider failed after streaming; drop its partial output.
+        msg.reasoning = undefined;
       } else if (type === 'Fallback') {
-        msg.fallbackInfo = { failed: text.failed, next: text.next };
+        const info = text as { failed: string; next: string };
+        msg.fallbackInfo = { failed: info.failed, next: info.next };
       }
     });
 
     try {
-      console.log('[AI] submitInput: calling invoke, seq=', seq);
       const result = await withTimeout(
         invoke<OrganizeResult>('ai_process_input', { content: fullContent, seq, locale: currentLocale() }),
         120_000,
+        seq,
       );
-      console.log('[AI] submitInput: invoke returned', result);
 
       if (seq !== requestSeq) return;
 
@@ -122,7 +131,7 @@ export const useAiStore = defineStore('ai', () => {
         msg.reasoning = result.reasoning;
         msg.status = 'done';
         msg.suggestions = [{
-          action: result.action as any,
+          action: result.action,
           title: result.title,
           folder: result.folder,
           tags: result.tags,
@@ -135,29 +144,24 @@ export const useAiStore = defineStore('ai', () => {
       if (seq !== requestSeq) return;
 
       const errMsg = extractError(e);
-      console.error('[AI] submitInput failed:', e);
       const msg = getMsg();
       if (msg) {
         msg.content = t('ai.processFailed', { msg: errMsg });
         msg.status = 'error';
       }
     } finally {
-      if (streamUnlisten) {
-        streamUnlisten();
-        streamUnlisten = null;
-      }
+      unlisten();
       if (seq === requestSeq) {
         isProcessing.value = false;
       }
     }
   }
 
+  /** Mark the current request cancelled locally and abort it in the backend. */
   function cancel() {
+    const seq = requestSeq;
     requestSeq++;
-    if (streamUnlisten) {
-      streamUnlisten();
-      streamUnlisten = null;
-    }
+    invoke('ai_cancel', { seq }).catch(() => { /* best effort */ });
     isProcessing.value = false;
     const lastMsg = messages.value[messages.value.length - 1];
     if (lastMsg && lastMsg.status === 'pending') {
@@ -166,9 +170,12 @@ export const useAiStore = defineStore('ai', () => {
     }
   }
 
-  async function applyResult(result: OrganizeResult) {
-    // Clear suggestions immediately to prevent duplicate clicks
-    const assistantMsg = messages.value.find(m => m.suggestions?.length);
+  async function applyResult(result: OrganizeResult, msgId?: string) {
+    // Clear the suggestions of the specific message (default: last with
+    // suggestions) to prevent duplicate applies.
+    const assistantMsg = msgId
+      ? messages.value.find(m => m.id === msgId)
+      : [...messages.value].reverse().find(m => m.suggestions?.length);
     if (assistantMsg) {
       assistantMsg.suggestions = undefined;
     }
@@ -193,7 +200,6 @@ export const useAiStore = defineStore('ai', () => {
       }
     } catch (e: unknown) {
       const errMsg = extractError(e);
-      console.error('[AI] applyResult failed:', e);
       messages.value.push({
         id: crypto.randomUUID(),
         role: 'system',
@@ -204,10 +210,12 @@ export const useAiStore = defineStore('ai', () => {
     }
   }
 
-  function dismiss() {
+  function dismiss(msgId?: string) {
     lastResult.value = null;
-    const last = messages.value[messages.value.length - 1];
-    if (last) last.suggestions = [];
+    const msg = msgId
+      ? messages.value.find(m => m.id === msgId)
+      : messages.value[messages.value.length - 1];
+    if (msg) msg.suggestions = [];
   }
 
   async function optimizeNote(noteId: string, instruction: string) {
@@ -234,18 +242,18 @@ export const useAiStore = defineStore('ai', () => {
 
     const getMsg = () => messages.value.find(m => m.id === aiMsgId);
 
-    if (streamUnlisten) { streamUnlisten(); streamUnlisten = null; }
-    streamUnlisten = await listen<{ seq: number; event: { type: string; text: any } }>('ai-stream', (evt) => {
-      if (evt.payload.seq !== seq) return;
+    const unlisten = await listenStream(seq, ({ type, text }) => {
       const msg = getMsg();
-      if (!msg) return;
-      const { type, text } = evt.payload.event;
+      if (!msg || msg.status === 'error') return;
       if (type === 'Reasoning') {
         if (!msg.reasoning) msg.reasoning = '';
-        msg.reasoning += text;
+        msg.reasoning += text as string;
         if (msg.content === t('ai.optimizing')) msg.content = t('ai.thinkingStatus');
+      } else if (type === 'Reset') {
+        msg.reasoning = undefined;
       } else if (type === 'Fallback') {
-        msg.fallbackInfo = { failed: text.failed, next: text.next };
+        const info = text as { failed: string; next: string };
+        msg.fallbackInfo = { failed: info.failed, next: info.next };
       }
     });
 
@@ -253,6 +261,7 @@ export const useAiStore = defineStore('ai', () => {
       const result = await withTimeout(
         invoke<{ title: string; content: string; summary: string }>('ai_optimize_note', { noteId, instruction, seq, locale: currentLocale() }),
         120_000,
+        seq,
       );
 
       if (seq !== requestSeq) return;
@@ -264,7 +273,7 @@ export const useAiStore = defineStore('ai', () => {
         msg.status = 'done';
         // Store optimize result as a special suggestion
         msg.suggestions = [{
-          action: 'optimize' as any,
+          action: 'optimize',
           title: result.title,
           content: result.content,
           target_note_id: noteId,
@@ -280,21 +289,21 @@ export const useAiStore = defineStore('ai', () => {
         msg.status = 'error';
       }
     } finally {
-      if (streamUnlisten) { streamUnlisten(); streamUnlisten = null; }
+      unlisten();
       if (seq === requestSeq) isProcessing.value = false;
     }
   }
 
-  async function applyOptimize(noteId: string, title: string, content: string) {
-    const assistantMsg = messages.value.find(m => m.suggestions?.length);
+  async function applyOptimize(noteId: string, title: string, content: string, msgId?: string) {
+    const assistantMsg = msgId
+      ? messages.value.find(m => m.id === msgId)
+      : [...messages.value].reverse().find(m => m.suggestions?.length);
     if (assistantMsg) assistantMsg.suggestions = undefined;
 
     try {
       const notebookStore = useNotebookStore();
-      await notebookStore.updateNoteContent(noteId, content);
-      if (title) {
-        await notebookStore.updateNoteContent(noteId, content, title);
-      }
+      // One write with both fields; works whether or not the note is open.
+      await notebookStore.updateNoteContent(noteId, content, title || undefined);
       await notebookStore.loadFolderTree();
       await notebookStore.loadAllNotes();
 

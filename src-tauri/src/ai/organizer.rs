@@ -1,12 +1,14 @@
 // src-tauri/src/ai/organizer.rs
-use crate::ai::provider::{ChatOptions, ProviderConfig, StreamCallback, create_provider};
 use crate::ai::prompt::PromptTemplates;
-use crate::error::AppResult;
+use crate::ai::provider::{
+    create_provider, truncate_chars, CancelToken, ChatOptions, ProviderConfig, StreamCallback,
+};
+use crate::error::{AppError, AppResult};
 use crate::notebook::model::Note;
 use crate::storage::database::Database;
 use crate::storage::markdown::MarkdownStorage;
-use serde::{Deserialize, Serialize};
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrganizeResult {
@@ -69,21 +71,32 @@ fn extract_json(text: &str) -> &str {
     trimmed
 }
 
+/// Format the error shown when the LLM reply is not valid JSON. Char-safe
+/// truncation: byte slicing would panic on CJK text split mid-character.
+fn parse_error(prefix: &str, err: &serde_json::Error, raw: &str) -> AppError {
+    AppError::AiEngine(format!(
+        "{}: {}. 原始: {}",
+        prefix,
+        err,
+        truncate_chars(raw, 200)
+    ))
+}
+
 pub struct AiOrganizer;
 
 impl AiOrganizer {
     pub async fn process_user_input_stream(
-        config: &ProviderConfig,
+        config: ProviderConfig,
         content: &str,
         folder_structure: &str,
         related_notes: &str,
         on_event: Option<StreamCallback>,
+        cancel: CancelToken,
         locale: &str,
     ) -> AppResult<OrganizeResult> {
-        eprintln!("[AI] process_user_input: provider={}, model={}", config.name, config.model_name);
-        let provider = create_provider(config)?;
-        let messages = PromptTemplates::categorize(content, folder_structure, related_notes, locale);
-        eprintln!("[AI] Sending chat request with {} messages", messages.len());
+        let provider = create_provider(&config)?;
+        let messages =
+            PromptTemplates::categorize(content, folder_structure, related_notes, locale);
 
         let options = ChatOptions {
             max_tokens: 8192,
@@ -91,63 +104,64 @@ impl AiOrganizer {
         };
 
         let response = match on_event {
-            Some(cb) => provider.chat_stream(messages, options, cb).await?,
+            Some(cb) => provider.chat_stream(messages, options, cb, cancel).await?,
             None => provider.chat(messages, options).await?,
         };
-        eprintln!("[AI] Response received, content length: {}", response.content.len());
 
         let json_str = extract_json(&response.content);
-        eprintln!("[AI] Extracted JSON: {} bytes", json_str.len());
-        let mut result: OrganizeResult = serde_json::from_str(json_str).map_err(|e| {
-            crate::error::AppError::AiEngine(format!(
-                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
-            ))
-        })?;
+        let mut result: OrganizeResult = serde_json::from_str(json_str)
+            .map_err(|e| parse_error("AI 返回格式错误", &e, &response.content))?;
+        // The folder comes straight from LLM output; the storage layer rejects
+        // anything that would escape the vault, but drop obviously bogus
+        // values early so users see a sane note location.
+        if MarkdownStorage::validate_folder(&result.folder).is_err() {
+            result.folder = String::new();
+        }
         result.reasoning = response.reasoning;
         Ok(result)
     }
 
     pub async fn enrich_note(
-        config: &ProviderConfig,
+        config: ProviderConfig,
         title: &str,
         content: &str,
+        cancel: CancelToken,
         locale: &str,
     ) -> AppResult<EnrichResult> {
-        let provider = create_provider(config)?;
+        let provider = create_provider(&config)?;
         let messages = PromptTemplates::enrich(title, content, locale);
         let response = provider.chat(messages, ChatOptions::default()).await?;
+        crate::ai::provider::err_if_cancelled(&cancel)?;
 
         let json_str = extract_json(&response.content);
-        serde_json::from_str(json_str).map_err(|e| {
-            crate::error::AppError::AiEngine(format!(
-                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
-            ))
-        })
+        serde_json::from_str(json_str)
+            .map_err(|e| parse_error("AI 返回格式错误", &e, &response.content))
     }
 
     pub async fn optimize_note(
-        config: &ProviderConfig,
+        config: ProviderConfig,
         title: &str,
         content: &str,
         instruction: &str,
         on_event: Option<StreamCallback>,
+        cancel: CancelToken,
         locale: &str,
     ) -> AppResult<OptimizeResult> {
-        let provider = create_provider(config)?;
+        let provider = create_provider(&config)?;
         let messages = PromptTemplates::optimize(title, content, instruction, locale);
-        let options = ChatOptions { max_tokens: 8192, ..ChatOptions::default() };
+        let options = ChatOptions {
+            max_tokens: 8192,
+            ..ChatOptions::default()
+        };
 
         let response = match on_event {
-            Some(cb) => provider.chat_stream(messages, options, cb).await?,
+            Some(cb) => provider.chat_stream(messages, options, cb, cancel).await?,
             None => provider.chat(messages, options).await?,
         };
 
         let json_str = extract_json(&response.content);
-        serde_json::from_str(json_str).map_err(|e| {
-            crate::error::AppError::AiEngine(format!(
-                "AI 返回格式错误: {}. 原始: {}", e, &response.content[..response.content.len().min(200)]
-            ))
-        })
+        serde_json::from_str(json_str)
+            .map_err(|e| parse_error("AI 返回格式错误", &e, &response.content))
     }
 
     pub fn apply_create(
@@ -156,7 +170,8 @@ impl AiOrganizer {
         result: &OrganizeResult,
     ) -> AppResult<Note> {
         crate::notebook::service::NotebookService::create_note(
-            db, md,
+            db,
+            md,
             crate::notebook::model::CreateNoteRequest {
                 folder: result.folder.clone(),
                 title: result.title.clone(),
@@ -172,14 +187,24 @@ impl AiOrganizer {
         note_id: &str,
         result: &OrganizeResult,
     ) -> AppResult<Note> {
-        let (note, existing_content) = crate::notebook::service::NotebookService::get_note(db, md, note_id)?;
+        let (note, existing_content) =
+            crate::notebook::service::NotebookService::get_note(db, md, note_id)?;
         let new_content = format!("{}\n\n---\n{}", existing_content, result.content);
+        // Merge tags instead of replacing: the prompt asks the model to
+        // combine them, but don't lose existing tags if it didn't.
+        let mut tags = note.tags.clone();
+        for t in &result.tags {
+            if !tags.iter().any(|existing| existing.eq_ignore_ascii_case(t)) {
+                tags.push(t.clone());
+            }
+        }
         crate::notebook::service::NotebookService::update_note(
-            db, md,
+            db,
+            md,
             crate::notebook::model::UpdateNoteRequest {
                 id: note.id.clone(),
                 content: Some(new_content),
-                tags: Some(result.tags.clone()),
+                tags: Some(tags),
                 title: None,
                 folder: None,
             },
@@ -202,5 +227,43 @@ impl AiOrganizer {
             params![id, note_id, operation_type, before, after, status, now],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_json_plain() {
+        assert_eq!(extract_json(r#"  {"a":1}  "#), r#"{"a":1}"#);
+    }
+
+    #[test]
+    fn extract_json_fenced() {
+        assert_eq!(extract_json("```json\n{\"a\":1}\n```"), r#"{"a":1}"#);
+        assert_eq!(extract_json("```\n{\"a\":1}\n```"), r#"{"a":1}"#);
+    }
+
+    #[test]
+    fn extract_json_embedded() {
+        assert_eq!(
+            extract_json("Here is the result: {\"a\": {\"b\": 2}} hope it helps"),
+            r#"{"a": {"b": 2}}"#
+        );
+    }
+
+    #[test]
+    fn extract_json_no_json_returns_trimmed() {
+        assert_eq!(extract_json("  no json here  "), "no json here");
+    }
+
+    #[test]
+    fn parse_error_is_char_safe_for_cjk() {
+        let long_cjk = "中".repeat(500);
+        let err = serde_json::from_str::<serde_json::Value>(&long_cjk).unwrap_err();
+        // Must not panic despite multi-byte text.
+        let e = parse_error("AI 返回格式错误", &err, &long_cjk);
+        assert!(e.to_string().contains("AI 返回格式错误"));
     }
 }

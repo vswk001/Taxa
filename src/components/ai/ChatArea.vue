@@ -1,9 +1,16 @@
 <template>
-  <div class="chat-area">
+  <div class="chat-area" ref="scrollRef" @scroll="onScroll">
     <div v-if="messages.length === 0" class="empty-chat">
       <p>{{ t('ai.emptyChat') }}</p>
     </div>
-    <div v-for="msg in messages" :key="msg.id" :class="['message', msg.role]">
+    <!-- v-memo: a Reasoning tick re-renders only the streaming message, not
+         the whole (unbounded) history. -->
+    <div
+      v-for="msg in messages"
+      :key="msg.id"
+      v-memo="[msg.content, msg.status, msg.reasoning?.length, !!msg.suggestions?.length, msg.fallbackInfo?.next, expandedMap[msg.id]]"
+      :class="['message', msg.role]"
+    >
       <div v-if="msg.reasoning" class="thinking-card" :class="{ collapsed: !expandedMap[msg.id] }">
         <div class="thinking-header" @click="expandedMap[msg.id] = !expandedMap[msg.id]">
           <svg class="chevron" :class="{ rotated: expandedMap[msg.id] }" viewBox="0 0 24 24" width="14" height="14"><polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -24,15 +31,15 @@
       <OperationCard
         v-if="msg.suggestions?.length"
         :suggestion="msg.suggestions[0]"
-        @confirm="handleConfirm(msg.suggestions[0], $event)"
-        @dismiss="emit('dismiss')"
+        @confirm="handleConfirm(msg, msg.suggestions[0], $event)"
+        @dismiss="emit('dismiss', msg.id)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { reactive, ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { ChatMessage, AiSuggestion } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
@@ -40,9 +47,14 @@ import OperationCard from './OperationCard.vue';
 
 const { t } = useI18n();
 
-defineProps<{ messages: ChatMessage[] }>();
-const emit = defineEmits<{ apply: [result: OrganizeResult]; applyOptimize: [noteId: string, title: string, content: string]; dismiss: [] }>();
+const props = defineProps<{ messages: ChatMessage[] }>();
+const emit = defineEmits<{
+  apply: [payload: { result: OrganizeResult; msgId: string }];
+  applyOptimize: [payload: { noteId: string; title: string; content: string; msgId: string }];
+  dismiss: [msgId: string];
+}>();
 const expandedMap = reactive<Record<string, boolean>>({});
+const scrollRef = ref<HTMLElement | null>(null);
 
 function preview(text: string) {
   const first = text.split('\n')[0] || '';
@@ -51,20 +63,43 @@ function preview(text: string) {
 
 function toResult(s: AiSuggestion): OrganizeResult {
   return {
-    action: s.action, title: s.title || '', folder: s.folder || '',
+    // 'rename'/'tag' are legacy values that no longer occur; normalize them.
+    action: s.action === 'append' ? 'append' : 'create', title: s.title || '', folder: s.folder || '',
     tags: s.tags || [], content: s.content || '',
     target_note_id: s.target_note_id || null, complexity: 'complex',
   };
 }
 
-function handleConfirm(original: AiSuggestion, modified: AiSuggestion) {
+function handleConfirm(msg: ChatMessage, original: AiSuggestion, modified: AiSuggestion) {
   if (modified.action === 'optimize') {
     const noteId = original.target_note_id || modified.target_note_id || '';
-    emit('applyOptimize', noteId, modified.title || '', modified.content || '');
+    emit('applyOptimize', { noteId, title: modified.title || '', content: modified.content || '', msgId: msg.id });
   } else {
-    emit('apply', toResult(modified));
+    emit('apply', { result: toResult(modified), msgId: msg.id });
   }
 }
+
+// Keep the newest message in view while it streams, but only when the user
+// hasn't scrolled up to read history ("stick to bottom").
+let pinnedToBottom = true;
+
+function onScroll() {
+  const el = scrollRef.value;
+  if (!el) return;
+  pinnedToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+}
+
+watch(() => props.messages.map(m => m.id).join(',') + ':' + props.messages.map(m => (m.reasoning?.length ?? 0)).join(','), async () => {
+  if (props.messages.length === 0) {
+    // Chat cleared: drop stale expansion state.
+    for (const key of Object.keys(expandedMap)) delete expandedMap[key];
+    return;
+  }
+  if (!pinnedToBottom) return;
+  await nextTick();
+  const el = scrollRef.value;
+  if (el) el.scrollTop = el.scrollHeight;
+});
 </script>
 
 <style scoped>
