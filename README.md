@@ -41,7 +41,7 @@ It also ships an **MCP server**, so tools like Claude Code and Codex can search 
 
 ## 📥 Build from source
 
-Pre-built binaries aren't published yet. To run it yourself:
+Pre-built binaries are on the [releases page](https://github.com/vswk001/Taxa/releases). To build from source:
 
 **Prerequisites**
 

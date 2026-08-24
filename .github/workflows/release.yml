@@ -46,14 +46,23 @@ jobs:
             args: ''
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Verify updater signing secrets
+      - name: Check updater signing secrets
+        id: signing
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::error::TAURI_PRIVATE_KEY secret is missing. The updater pubkey in tauri.conf.json makes the bundler require the private key — add TAURI_PRIVATE_KEY and TAURI_KEY_PASSWORD as repo secrets."
-            exit 1
+          # With an updater pubkey configured, the bundler requires the
+          # private key to produce signed updater artifacts (latest.json).
+          # If the secrets aren't set yet, degrade gracefully: skip updater
+          # artifacts for this build. No released client ships the updater
+          # yet, so nothing polls for latest.json today. Once the secrets
+          # exist, later releases pick up signed artifacts automatically.
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::TAURI_PRIVATE_KEY secret is not set — building WITHOUT updater artifacts (latest.json). Add TAURI_PRIVATE_KEY and TAURI_KEY_PASSWORD as repo secrets to enable signed in-app updates."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
       # On manual dispatch, build the exact commit the tag points at — the
@@ -61,6 +70,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Write no-updater config override
+        if: steps.signing.outputs.signed == 'false'
+        run: printf '{"bundle":{"createUpdaterArtifacts":false}}' > no-updater-config.json
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # actions/setup-node@v4
@@ -97,7 +110,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # App-update signing (tauri updater): signs the update bundles and
-          # emits latest.json to the release (required, see preflight above).
+          # emits latest.json to the release. Set only when the secrets
+          # exist — otherwise the config override below disables updater
+          # artifacts so the build succeeds unsigned.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
@@ -111,7 +126,10 @@ jobs:
           # in-app updates 404ing until then.
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          # Without signing secrets, override the config to skip updater
+          # artifacts (the configured pubkey would otherwise make the
+          # bundler demand the private key).
+          args: ${{ matrix.args }}${{ steps.signing.outputs.signed == 'false' && ' --config no-updater-config.json' || '' }}
 
   # Standalone taxa-mcp binaries, uploaded to the same release. Runs after the
   # app release exists. Native per-platform build (universal on macOS).

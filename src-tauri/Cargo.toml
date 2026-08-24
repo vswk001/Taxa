@@ -1,6 +1,6 @@
 [package]
 name = "taxa"
-version = "0.2.0"
+version.workspace = true
 description = "Taxa — an AI-powered, local-first notebook"
 authors = ["Taxa contributors"]
 license = "MIT"
