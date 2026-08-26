@@ -22,6 +22,10 @@ pub enum AppError {
     /// The user cancelled the operation.
     #[error("已取消")]
     Cancelled(String),
+    /// The operation doesn't apply to the note's current state (e.g. it is
+    /// in the trash).
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
     /// A caller-supplied path escaped the notes vault.
     #[error("Invalid path: {0}")]
     InvalidPath(String),

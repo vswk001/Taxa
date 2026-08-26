@@ -1,9 +1,11 @@
 <template>
-  <Milkdown />
+  <div ref="containerRef" class="milkdown-container" @paste="onPaste" @drop.prevent="onDrop">
+    <Milkdown />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Milkdown, useEditor, useInstance } from '@milkdown/vue';
 import { Crepe } from '@milkdown/crepe';
@@ -11,11 +13,13 @@ import '@milkdown/crepe/theme/classic.css';
 import '@milkdown/crepe/theme/common/style.css';
 import { EditorState } from 'prosemirror-state';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 
 const { t } = useI18n();
 
-const props = defineProps<{ modelValue: string }>();
+const props = defineProps<{ modelValue: string; noteId?: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+const containerRef = ref<HTMLElement | null>(null);
 
 // Programmatic-set echo suppression: instead of a time-based flag (which
 // swallowed keystrokes within its window), the first markdownUpdated after a
@@ -26,6 +30,92 @@ let currentMarkdown = props.modelValue;
 // Values arriving while the editor is still initializing are queued and
 // applied once it is ready (previously they were silently dropped).
 let pendingValue: string | null = null;
+
+// ---- image attachments ---------------------------------------------------
+// Markdown stores portable relative paths (attachments/x.png); the webview
+// can only load local files through the asset protocol. Rewrite <img src>
+// for display, and undo the rewrite when emitting markdown back.
+
+let assetPrefix = ''; // convertFileSrc("<attachments dir>/")
+
+void (async () => {
+  try {
+    const info = await invoke<{ attachments_dir: string }>('get_vault_info');
+    assetPrefix = convertFileSrc(`${info.attachments_dir.split('\\').join('/')}/`);
+  } catch {
+    /* images stay as plain relative paths */
+  }
+})();
+
+function toDisplayMarkdown(markdown: string): string {
+  return assetPrefix ? markdown.split(assetPrefix).join('attachments/') : markdown;
+}
+
+let observer: MutationObserver | null = null;
+
+function rewriteImgSrc(root: HTMLElement) {
+  if (!assetPrefix) return;
+  for (const img of root.querySelectorAll<HTMLImageElement>('img[src^="attachments/"]')) {
+    img.src = assetPrefix + img.getAttribute('src');
+  }
+}
+
+onMounted(() => {
+  observer = new MutationObserver(() => {
+    if (containerRef.value) rewriteImgSrc(containerRef.value);
+  });
+  if (containerRef.value) {
+    observer.observe(containerRef.value, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+    rewriteImgSrc(containerRef.value);
+  }
+});
+
+onBeforeUnmount(() => observer?.disconnect());
+
+async function insertAtCursor(text: string) {
+  const editor = getInstance();
+  if (!editor || loading.value) return;
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    view.dispatch(view.state.tr.insertText(text).scrollIntoView());
+    view.focus();
+  });
+}
+
+async function saveAndInsert(file: File) {
+  if (!props.noteId) return;
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  const base64 = btoa(binary);
+  try {
+    const path = await invoke<string>('save_attachment', {
+      fileName: file.name || 'image.png',
+      data: base64,
+    });
+    await insertAtCursor(`
+![](${path})
+`);
+  } catch (e) {
+    console.error('failed to save attachment:', e);
+  }
+}
+
+function onPaste(e: ClipboardEvent) {
+  const files = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/'));
+  if (!files.length || !props.noteId) return;
+  e.preventDefault();
+  for (const file of files) void saveAndInsert(file);
+}
+
+async function onDrop(e: DragEvent) {
+  const files = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'));
+  if (!files.length || !props.noteId) return;
+  for (const file of files) await saveAndInsert(file);
+}
 
 useEditor((container) => {
   const crepe = new Crepe({
@@ -50,8 +140,9 @@ useEditor((container) => {
     listeners.markdownUpdated((_, markdown) => {
       if (applyingSetValue && markdown === lastAppliedValue) return; // our own echo
       applyingSetValue = false;
-      currentMarkdown = markdown;
-      emit('update:modelValue', markdown);
+      const display = toDisplayMarkdown(markdown);
+      currentMarkdown = display;
+      emit('update:modelValue', display);
     });
   });
 
@@ -111,6 +202,16 @@ watch(loading, (isLoading) => {
 </script>
 
 <style>
+.milkdown-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.milkdown-container .ProseMirror img {
+  max-width: 100%;
+}
+
 .milkdown {
   --crepe-color-background: var(--bg-primary);
   --crepe-color-on-background: var(--text-primary);

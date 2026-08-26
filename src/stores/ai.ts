@@ -50,7 +50,7 @@ export const useAiStore = defineStore('ai', () => {
   const messages = ref<ChatMessage[]>([]);
   const isProcessing = ref(false);
   const lastResult = ref<OrganizeResult | null>(null);
-  const mode = ref<'organize' | 'optimize'>('organize');
+  const mode = ref<'organize' | 'optimize' | 'ask'>('organize');
   let requestSeq = 0;
 
   /** Subscribe to backend stream events for one request. The unlisten handle
@@ -154,6 +154,80 @@ export const useAiStore = defineStore('ai', () => {
       if (seq === requestSeq) {
         isProcessing.value = false;
       }
+    }
+  }
+
+  /** Ask a question grounded in the user's notes (RAG). Answer tokens
+   *  stream live into the message; sources are attached at the end. */
+  async function askNote(question: string) {
+    const seq = ++requestSeq;
+    messages.value.push({
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: question,
+      timestamp: new Date().toISOString(),
+      status: 'done',
+    });
+
+    const aiMsgId = crypto.randomUUID();
+    messages.value.push({
+      id: aiMsgId,
+      role: 'assistant',
+      content: t('ai.thinkingStatus'),
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+    });
+    isProcessing.value = true;
+
+    const getMsg = () => messages.value.find((m) => m.id === aiMsgId);
+
+    const unlisten = await listenStream(seq, ({ type, text }) => {
+      const msg = getMsg();
+      if (!msg || msg.status === 'error') return;
+      if (type === 'Reasoning') {
+        if (!msg.reasoning) msg.reasoning = '';
+        msg.reasoning += text as string;
+      } else if (type === 'Content') {
+        // Ask mode renders the answer live.
+        if (msg.content === t('ai.thinkingStatus')) msg.content = '';
+        msg.content += text as string;
+      } else if (type === 'Reset') {
+        msg.reasoning = undefined;
+        msg.content = '';
+      } else if (type === 'Fallback') {
+        const info = text as { failed: string; next: string };
+        msg.fallbackInfo = { failed: info.failed, next: info.next };
+      }
+    });
+
+    try {
+      const result = await withTimeout(
+        invoke<{ answer: string; sources: { id: string; title: string; folder: string }[] }>(
+          'ai_ask_notes',
+          { question, seq, locale: currentLocale() },
+        ),
+        120_000,
+        seq,
+      );
+
+      if (seq !== requestSeq) return;
+      const msg = getMsg();
+      if (msg) {
+        msg.content = result.answer || t('ai.noAnswer');
+        msg.sources = result.sources;
+        msg.reasoning = undefined;
+        msg.status = 'done';
+      }
+    } catch (e: unknown) {
+      if (seq !== requestSeq) return;
+      const msg = getMsg();
+      if (msg) {
+        msg.content = t('ai.processFailed', { msg: extractError(e) });
+        msg.status = 'error';
+      }
+    } finally {
+      unlisten();
+      if (seq === requestSeq) isProcessing.value = false;
     }
   }
 
@@ -331,5 +405,5 @@ export const useAiStore = defineStore('ai', () => {
     lastResult.value = null;
   }
 
-  return { messages, isProcessing, lastResult, mode, submitInput, cancel, applyResult, dismiss, optimizeNote, applyOptimize, clearMessages };
+  return { messages, isProcessing, lastResult, mode, submitInput, cancel, applyResult, dismiss, optimizeNote, applyOptimize, askNote, clearMessages };
 });

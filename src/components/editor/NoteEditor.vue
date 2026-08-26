@@ -9,7 +9,18 @@
           @blur="saveTitle"
           @keyup.enter="saveTitle"
         />
-        <span class="note-meta">{{ t('editor.wordCount', { count: wordCount }) }}</span>
+        <div class="header-right">
+          <button
+            v-if="notebookStore.currentNote"
+            class="links-btn"
+            :class="{ active: linksVisible }"
+            :title="t('editor.backlinks')"
+            @click="linksVisible = !linksVisible"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          </button>
+          <span class="note-meta">{{ t('editor.wordCount', { count: wordCount }) }}</span>
+        </div>
       </div>
       <div class="tag-row">
         <span
@@ -39,6 +50,13 @@
       <span class="no-note-message">{{ t('editor.noNote') }}</span>
     </div>
 
+    <BacklinkPanel
+      :open="linksVisible"
+      :note-id="notebookStore.currentNote?.note.id ?? null"
+      :note-folder="notebookStore.currentNote?.note.folder ?? ''"
+      @close="linksVisible = false"
+    />
+
     <EditorSearch
       :visible="searchVisible"
       :container="editorContainer"
@@ -46,7 +64,7 @@
     />
 
     <div v-if="notebookStore.currentNote" ref="editorContainer" class="editor-body">
-      <MilkdownEditor v-model="localContent" />
+      <MilkdownEditor v-model="localContent" :note-id="notebookStore.currentNote?.note.id" />
     </div>
     <div v-else class="editor-placeholder">
       <div class="placeholder-content">
@@ -64,6 +82,7 @@ import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 
 import EditorSearch from './EditorSearch.vue';
+import BacklinkPanel from './BacklinkPanel.vue';
 
 // Lazy-load the editor stack (Milkdown + ProseMirror + KaTeX) so the app
 // shell paints before the ~1.5 MB chunk downloads and parses.
@@ -79,6 +98,7 @@ const tagInputVisible = ref(false);
 const newTag = ref('');
 const tagInputRef = ref<HTMLInputElement | null>(null);
 const searchVisible = ref(false);
+const linksVisible = ref(false);
 const editorContainer = ref<HTMLElement | null>(null);
 /** Transient banner shown when a save fails (the old code only logged). */
 const saveError = ref('');
@@ -263,6 +283,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-primary);
+  position: relative;
 }
 
 .note-header {
@@ -383,6 +404,28 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
   margin-left: 12px;
   white-space: nowrap;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.links-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 3px;
+  border-radius: 4px;
+}
+
+.links-btn:hover,
+.links-btn.active {
+  color: var(--accent-color);
+  background: var(--bg-secondary);
 }
 
 .editor-body {

@@ -8,7 +8,7 @@
     <div
       v-for="msg in messages"
       :key="msg.id"
-      v-memo="[msg.content, msg.status, msg.reasoning?.length, !!msg.suggestions?.length, msg.fallbackInfo?.next, expandedMap[msg.id]]"
+      v-memo="[msg.content, msg.status, msg.reasoning?.length, !!msg.suggestions?.length, msg.fallbackInfo?.next, expandedMap[msg.id], msg.sources?.length]"
       :class="['message', msg.role]"
     >
       <div v-if="msg.reasoning" class="thinking-card" :class="{ collapsed: !expandedMap[msg.id] }">
@@ -25,6 +25,11 @@
         {{ t('ai.fallbackNotice', { failed: msg.fallbackInfo.failed, next: msg.fallbackInfo.next }) }}
       </div>
       <div class="message-content">{{ msg.content }}</div>
+      <div v-if="msg.sources?.length" class="source-list">
+        <button v-for="src in msg.sources" :key="src.id" class="source-chip" @click="emit('openNote', src.id)">
+          {{ src.title }}
+        </button>
+      </div>
       <div v-if="msg.attachments?.length" class="msg-attachments">
         <span v-for="a in msg.attachments" :key="a.name" class="msg-file-chip">📎 {{ a.name }}</span>
       </div>
@@ -49,6 +54,7 @@ const { t } = useI18n();
 
 const props = defineProps<{ messages: ChatMessage[] }>();
 const emit = defineEmits<{
+  openNote: [id: string];
   apply: [payload: { result: OrganizeResult; msgId: string }];
   applyOptimize: [payload: { noteId: string; title: string; content: string; msgId: string }];
   dismiss: [msgId: string];
@@ -116,6 +122,28 @@ watch(() => props.messages.map(m => m.id).join(',') + ':' + props.messages.map(m
   background: rgba(255,255,255,0.15);
 }
 .message:not(.user) .msg-file-chip { background: var(--bg-secondary); }
+.source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.source-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.source-chip:hover {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
 .fallback-note {
   font-size: 11px; padding: 3px 8px; margin-bottom: 6px;
   border-radius: 4px; color: #b8860b;

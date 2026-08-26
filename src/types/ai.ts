@@ -35,6 +35,8 @@ export interface ChatMessage {
   attachments?: FileAttachment[];
   /** Set when the engine fell back to another provider (failed -> next). */
   fallbackInfo?: { failed: string; next: string };
+  /** Notes cited by an ask-mode answer. */
+  sources?: { id: string; title: string; folder: string }[];
 }
 
 /** Mirrors the Rust StreamEvent enum (serde tag="type", content="text"). */

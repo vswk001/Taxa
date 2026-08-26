@@ -2,6 +2,7 @@
   <MilkdownProvider>
     <MilkdownCore
       :model-value="modelValue"
+      :note-id="noteId"
       @update:model-value="$emit('update:modelValue', $event)"
     />
   </MilkdownProvider>
@@ -11,6 +12,6 @@
 import { MilkdownProvider } from '@milkdown/vue';
 import MilkdownCore from './MilkdownCore.vue';
 
-defineProps<{ modelValue: string }>();
+defineProps<{ modelValue: string; noteId?: string }>();
 defineEmits<{ 'update:modelValue': [value: string] }>();
 </script>

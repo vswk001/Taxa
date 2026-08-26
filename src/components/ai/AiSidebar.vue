@@ -48,7 +48,13 @@
 
     <!-- Chat Area -->
     <div v-show="!showConfig" class="chat-wrap">
-      <ChatArea :messages="aiStore.messages" @apply="onApply" @apply-optimize="onApplyOptimize" @dismiss="aiStore.dismiss($event)" />
+      <ChatArea
+        :messages="aiStore.messages"
+        @apply="onApply"
+        @apply-optimize="onApplyOptimize"
+        @dismiss="aiStore.dismiss($event)"
+        @open-note="openNoteById"
+      />
       <div v-if="aiStore.isProcessing" class="processing-bar">
         <span class="processing-text">{{ t('ai.processing') }}</span>
         <button class="cancel-btn" @click="aiStore.cancel()">{{ t('ai.cancel') }}</button>
@@ -58,6 +64,7 @@
           <select v-model="aiStore.mode" class="mode-select">
             <option value="organize">{{ t('ai.modeOrganize') }} — {{ t('ai.modeOrganizeDesc') }}</option>
             <option value="optimize">{{ t('ai.modeOptimize') }} — {{ t('ai.modeOptimizeDesc') }}</option>
+            <option value="ask">{{ t('ai.modeAsk') }} — {{ t('ai.modeAskDesc') }}</option>
           </select>
         </div>
         <ChatInput :disabled="aiStore.isProcessing" :mode="aiStore.mode" @submit="handleSubmit" />
@@ -110,6 +117,16 @@ function showConfirm(msg: string): Promise<boolean> {
   });
 }
 
+async function openNoteById(id: string) {
+  const notebookStore = useNotebookStore();
+  await notebookStore.openNote(id);
+  const note = notebookStore.currentNote;
+  if (note) {
+    const { useEditorStore } = await import('@/stores/editor');
+    useEditorStore().openTab(note.note.id, note.note.title);
+  }
+}
+
 function onApply(payload: { result: import('@/types/ai-extended').OrganizeResult; msgId: string }) {
   aiStore.applyResult(payload.result, payload.msgId);
 }
@@ -132,6 +149,8 @@ function handleSubmit(content: string, attachments: import('@/types/ai').FileAtt
       return;
     }
     aiStore.optimizeNote(note.note.id, content);
+  } else if (aiStore.mode === 'ask') {
+    aiStore.askNote(content);
   } else {
     aiStore.submitInput(content, attachments);
   }

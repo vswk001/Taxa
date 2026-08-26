@@ -6,6 +6,7 @@ use crate::storage::database::Database;
 use crate::storage::markdown::MarkdownStorage;
 use chrono::Utc;
 use rusqlite::params;
+use std::path::Path;
 use uuid::Uuid;
 
 pub struct NotebookService;
@@ -116,6 +117,9 @@ impl NotebookService {
         req: UpdateNoteRequest,
     ) -> AppResult<Note> {
         let mut note = Self::query_note_by_id(db, &req.id)?;
+        if Self::is_deleted(db, &req.id)? {
+            return Err(AppError::InvalidState("Note is in the trash".into()));
+        }
         let now = Utc::now().to_rfc3339();
 
         // If title changed, rename the file. Compensate by renaming back if
@@ -179,9 +183,85 @@ impl NotebookService {
         Ok(())
     }
 
-    pub fn delete_note(db: &Database, md: &MarkdownStorage, id: &str) -> AppResult<()> {
+    /// Soft-delete: move the file into the trash directory and mark the row.
+    /// The note disappears from every listing/search; `restore_note` undoes it.
+    pub fn trash_note(
+        db: &Database,
+        md: &MarkdownStorage,
+        id: &str,
+        trash_dir: &Path,
+    ) -> AppResult<()> {
         let note = Self::query_note_by_id(db, id)?;
-        md.delete_note(&note.path)?;
+        if Self::is_deleted(db, id)? {
+            return Err(AppError::InvalidState(
+                "Note is already in the trash".into(),
+            ));
+        }
+        std::fs::create_dir_all(trash_dir)?;
+        std::fs::rename(md.full_path(&note.path), trash_dir.join(format!("{id}.md")))?;
+
+        let now = Utc::now().to_rfc3339();
+        let conn = db.conn();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE notes SET deleted_at=?1 WHERE id=?2",
+            params![now, id],
+        )?;
+        tx.execute(
+            "DELETE FROM notes_fts WHERE rowid=(SELECT rowid FROM notes WHERE id=?1)",
+            params![id],
+        )?;
+        tx.commit().inspect_err(|_e| {
+            // Compensate: put the file back so the row stays consistent.
+            let _ = std::fs::rename(trash_dir.join(format!("{id}.md")), md.full_path(&note.path));
+        })?;
+        Ok(())
+    }
+
+    /// Restore a trashed note to its original location.
+    pub fn restore_note(
+        db: &Database,
+        md: &MarkdownStorage,
+        id: &str,
+        trash_dir: &Path,
+    ) -> AppResult<Note> {
+        let note = Self::query_note_by_id(db, id)?;
+        if !Self::is_deleted(db, id)? {
+            return Err(AppError::InvalidState("Note is not in the trash".into()));
+        }
+        let trash_file = trash_dir.join(format!("{id}.md"));
+        if !trash_file.exists() {
+            return Err(AppError::NotFound(format!("Trashed file missing: {id}")));
+        }
+        let dest = md.full_path(&note.path);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::rename(&trash_file, &dest)?;
+
+        let content = md.read_note(&note.path).unwrap_or_default();
+        let conn = db.conn();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute("UPDATE notes SET deleted_at=NULL WHERE id=?1", params![id])?;
+        let tags_json = serde_json::to_string(&note.tags)?;
+        tx.execute(
+            "INSERT INTO notes_fts (rowid, title, content, tags)
+             SELECT rowid, ?1, ?2, ?3 FROM notes WHERE id=?4",
+            params![note.title, content, tags_json, id],
+        )?;
+        tx.commit().inspect_err(|_e| {
+            let _ = std::fs::rename(&dest, &trash_file);
+        })?;
+        graph::update_note_links(db, id, &content)?;
+        Ok(note)
+    }
+
+    /// Permanently delete a trashed note (file + row; links cascade).
+    pub fn purge_note(db: &Database, id: &str, trash_dir: &Path) -> AppResult<()> {
+        if !Self::is_deleted(db, id)? {
+            return Err(AppError::InvalidState("Note is not in the trash".into()));
+        }
+        let _ = std::fs::remove_file(trash_dir.join(format!("{id}.md")));
         let conn = db.conn();
         let tx = conn.unchecked_transaction()?;
         tx.execute(
@@ -190,12 +270,121 @@ impl NotebookService {
         )?;
         tx.execute("DELETE FROM notes WHERE id=?1", params![id])?;
         tx.commit()?;
-        // links rows cascade via FK; no manual cleanup needed.
         Ok(())
+    }
+
+    /// All trashed notes, newest deletion first.
+    pub fn list_trash(db: &Database) -> AppResult<Vec<TrashItem>> {
+        let mut stmt = db.conn().prepare(
+            "SELECT id, title, folder, deleted_at FROM notes
+             WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+        )?;
+        let items = stmt
+            .query_map([], |row| {
+                Ok(TrashItem {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    folder: row.get(2)?,
+                    deleted_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(items)
+    }
+
+    /// Empty the trash permanently. Returns the number of purged notes.
+    pub fn empty_trash(db: &Database, trash_dir: &Path) -> AppResult<usize> {
+        let items = Self::list_trash(db)?;
+        let mut purged = 0;
+        for item in items {
+            if Self::purge_note(db, &item.id, trash_dir).is_ok() {
+                purged += 1;
+            }
+        }
+        Ok(purged)
+    }
+
+    /// Backlinks, outgoing links, and unresolved [[targets]] for one note.
+    /// Backlinks/outgoing only include live (non-trashed) notes.
+    pub fn get_note_links(db: &Database, md: &MarkdownStorage, id: &str) -> AppResult<NoteLinks> {
+        let note = Self::query_note_by_id(db, id)?;
+        let conn = db.conn();
+
+        let mut backlinks = Vec::new();
+        {
+            let mut stmt = conn.prepare(
+                "SELECT n.id, n.title, n.folder, l.context FROM links l                  JOIN notes n ON n.id = l.source_note_id                  WHERE l.target_note_id = ?1 AND n.deleted_at IS NULL                  ORDER BY n.updated_at DESC",
+            )?;
+            let rows = stmt.query_map(params![id], |row| {
+                Ok(NoteLinkItem {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    folder: row.get(2)?,
+                    context: row.get(3).unwrap_or_default(),
+                })
+            })?;
+            for r in rows {
+                backlinks.push(r?);
+            }
+        }
+
+        let mut outgoing = Vec::new();
+        {
+            let mut stmt = conn.prepare(
+                "SELECT n.id, n.title, n.folder, l.context FROM links l                  JOIN notes n ON n.id = l.target_note_id                  WHERE l.source_note_id = ?1 AND n.deleted_at IS NULL                  ORDER BY n.title ASC",
+            )?;
+            let rows = stmt.query_map(params![id], |row| {
+                Ok(NoteLinkItem {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    folder: row.get(2)?,
+                    context: row.get(3).unwrap_or_default(),
+                })
+            })?;
+            for r in rows {
+                outgoing.push(r?);
+            }
+        }
+
+        // Unresolved: [[targets]] in this note that no live note has as title.
+        let mut unresolved = Vec::new();
+        {
+            let content = md.read_note(&note.path).unwrap_or_default();
+            let mut titles = std::collections::HashSet::new();
+            let mut stmt = conn.prepare("SELECT title FROM notes WHERE deleted_at IS NULL")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            for t in rows.flatten() {
+                titles.insert(t);
+            }
+            let mut seen = std::collections::HashSet::new();
+            for target in crate::link::parser::LinkParser::extract_links(&content) {
+                if !titles.contains(&target) && seen.insert(target.clone()) {
+                    unresolved.push(target);
+                }
+            }
+        }
+
+        Ok(NoteLinks {
+            backlinks,
+            outgoing,
+            unresolved,
+        })
+    }
+
+    pub fn is_deleted(db: &Database, id: &str) -> AppResult<bool> {
+        let deleted: Option<String> = db.conn().query_row(
+            "SELECT deleted_at FROM notes WHERE id=?1",
+            params![id],
+            |row| row.get(0),
+        )?;
+        Ok(deleted.is_some())
     }
 
     pub fn move_note(db: &Database, md: &MarkdownStorage, req: MoveNoteRequest) -> AppResult<Note> {
         let note = Self::query_note_by_id(db, &req.id)?;
+        if Self::is_deleted(db, &req.id)? {
+            return Err(AppError::InvalidState("Note is in the trash".into()));
+        }
         let new_title = req.new_title.unwrap_or_else(|| note.title.clone());
         let old_path = note.path.clone();
         let new_path = md.move_note(&note.path, &req.target_folder, &new_title)?;
@@ -265,35 +454,83 @@ impl NotebookService {
         Ok(new_path)
     }
 
-    /// Delete a folder on disk and remove all of its notes (and their FTS
-    /// rows) from the database. Link rows cascade via FK.
-    pub fn delete_folder(db: &Database, md: &MarkdownStorage, path: &str) -> AppResult<()> {
+    /// Soft-delete a folder: every note inside goes to the trash (restorable
+    /// with its original folder path), then the emptied directory is removed.
+    pub fn delete_folder(
+        db: &Database,
+        md: &MarkdownStorage,
+        path: &str,
+        trash_dir: &Path,
+    ) -> AppResult<()> {
         if path.is_empty() {
             return Err(AppError::InvalidPath("Cannot delete the vault root".into()));
         }
-        md.delete_folder(path)?;
         let old_len = path.chars().count() as i64;
         let child_prefix = format!("{}/", path);
 
         let conn = db.conn();
+        let ids: Vec<String> = {
+            let mut stmt = conn.prepare(
+                "SELECT id FROM notes WHERE deleted_at IS NULL AND (folder = ?1 OR substr(folder, 1, ?2) = ?3)",
+            )?;
+            let rows = stmt.query_map(params![path, old_len + 1, child_prefix], |r| r.get(0))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+        if ids.is_empty() {
+            md.delete_folder(path)?;
+            return Ok(());
+        }
+
+        // Move files to the trash first, then mark rows in one transaction.
+        std::fs::create_dir_all(trash_dir)?;
+        let now = Utc::now().to_rfc3339();
+        let mut moved: Vec<(String, String)> = Vec::new(); // (id, original rel path)
+        for id in &ids {
+            let note = Self::query_note_by_id(db, id)?;
+            let dest = trash_dir.join(format!("{id}.md"));
+            std::fs::rename(md.full_path(&note.path), &dest)?;
+            moved.push((id.clone(), note.path));
+        }
+
         let tx = conn.unchecked_transaction()?;
-        tx.execute(
-            "DELETE FROM notes_fts WHERE rowid IN (
-                SELECT rowid FROM notes WHERE folder = ?1 OR substr(folder, 1, ?2) = ?3)",
-            params![path, old_len + 1, child_prefix],
-        )?;
-        tx.execute(
-            "DELETE FROM notes WHERE folder = ?1 OR substr(folder, 1, ?2) = ?3",
-            params![path, old_len + 1, child_prefix],
-        )?;
-        tx.commit()?;
+        let mut db_ok = true;
+        for id in &ids {
+            if tx
+                .execute(
+                    "UPDATE notes SET deleted_at=?1 WHERE id=?2",
+                    params![now, id],
+                )
+                .is_err()
+            {
+                db_ok = false;
+                break;
+            }
+            let _ = tx.execute(
+                "DELETE FROM notes_fts WHERE rowid=(SELECT rowid FROM notes WHERE id=?1)",
+                params![id],
+            );
+        }
+        if db_ok {
+            tx.commit()?;
+        } else {
+            let _ = tx.rollback();
+            // Compensate: put every file back.
+            for (id, rel) in &moved {
+                let _ = std::fs::rename(trash_dir.join(format!("{id}.md")), md.full_path(rel));
+            }
+            return Err(AppError::Database("Failed to trash folder notes".into()));
+        }
+
+        // Directory is empty of trashed notes; remove it (attachments and
+        // unrelated files inside are gone with it, same as before).
+        let _ = md.delete_folder(path);
         Ok(())
     }
 
     pub fn list_notes(db: &Database, md: &MarkdownStorage, folder: &str) -> AppResult<Vec<Note>> {
         let mut stmt = db.conn().prepare(
             "SELECT id, path, title, folder, tags, created_at, updated_at, word_count, summary, ai_categorized
-             FROM notes WHERE folder = ?1 ORDER BY updated_at DESC"
+             FROM notes WHERE folder = ?1 AND deleted_at IS NULL ORDER BY updated_at DESC"
         )?;
         let mut notes = stmt
             .query_map(params![folder], row_to_note)?
@@ -351,7 +588,7 @@ impl NotebookService {
                     _ => format!("{} OR {}", title_clause, tags_clause),
                 };
                 let sql = format!(
-                    "SELECT id, title, path FROM notes WHERE {} ORDER BY updated_at DESC LIMIT 50",
+                    "SELECT id, title, path FROM notes WHERE deleted_at IS NULL AND {} ORDER BY updated_at DESC LIMIT 50",
                     where_sql
                 );
                 let mut stmt = conn.prepare(&sql)?;
@@ -390,7 +627,7 @@ impl NotebookService {
                         "SELECT notes.id, notes.title, notes.path, \
                                 snippet(notes_fts, 1, char(1), char(2), '…', 16) \
                          FROM notes_fts JOIN notes ON notes.rowid = notes_fts.rowid \
-                         WHERE notes_fts MATCH ?1 ORDER BY rank LIMIT 50",
+                         WHERE notes.deleted_at IS NULL AND notes_fts MATCH ?1 ORDER BY rank LIMIT 50",
                     )?;
                     let rows = stmt.query_map(params![fts_query], |row| {
                         Ok((
@@ -422,7 +659,7 @@ impl NotebookService {
                         "SELECT notes.id, notes.title, notes.path FROM notes \
                          WHERE notes.id IN (
                              SELECT n2.id FROM notes n2 JOIN notes_fts f ON n2.rowid = f.rowid \
-                             WHERE f.content LIKE ?1 ESCAPE '\\') \
+                             WHERE f.content LIKE ?1 ESCAPE '\\' AND n2.deleted_at IS NULL) \
                          ORDER BY notes.updated_at DESC LIMIT 50",
                     )?;
                     let rows = stmt.query_map(params![like_pattern], |row| {
@@ -454,7 +691,7 @@ impl NotebookService {
     pub fn list_recent_notes(db: &Database, limit: i64) -> AppResult<Vec<Note>> {
         let mut stmt = db.conn().prepare(
             "SELECT id, path, title, folder, tags, created_at, updated_at, word_count, summary, ai_categorized
-             FROM notes ORDER BY updated_at DESC LIMIT ?1"
+             FROM notes WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?1"
         )?;
         let notes = stmt
             .query_map(params![limit], row_to_note)?
@@ -644,13 +881,14 @@ mod tests {
     }
 
     #[test]
-    fn delete_folder_removes_db_rows() {
-        let (db, md, _tmp) = test_env();
+    fn delete_folder_soft_deletes() {
+        let (db, md, tmp) = test_env();
+        let trash = tmp.0.join("trash");
         make_note(&db, &md, "A", "gone", "content a");
         make_note(&db, &md, "B", "gone/deep", "content b");
         make_note(&db, &md, "C", "stay", "content c");
 
-        NotebookService::delete_folder(&db, &md, "gone").unwrap();
+        NotebookService::delete_folder(&db, &md, "gone", &trash).unwrap();
 
         assert!(NotebookService::list_notes(&db, &md, "gone")
             .unwrap()
@@ -663,6 +901,8 @@ mod tests {
             1
         );
         assert!(!md.base().join("gone").exists());
+        // Both notes are restorable, not gone.
+        assert_eq!(NotebookService::list_trash(&db).unwrap().len(), 2);
     }
 
     #[test]
@@ -693,6 +933,128 @@ mod tests {
         assert_eq!(count_words("这是中文内容"), 6);
         // 4 CJK chars (混合内容) + 1 English word (text)
         assert_eq!(count_words("混合 text 内容"), 5);
+    }
+
+    #[test]
+    fn trash_restore_roundtrip() {
+        let (db, md, dir) = test_env();
+        let trash = dir.0.join("trash");
+        let note = make_note(&db, &md, "T", "", "unique findable content");
+        make_note(&db, &md, "Other", "", "unrelated");
+
+        // Soft delete: disappears from listings and search.
+        NotebookService::trash_note(&db, &md, &note.id, &trash).unwrap();
+        let remaining = NotebookService::list_notes(&db, &md, "").unwrap();
+        assert!(!remaining.iter().any(|n| n.id == note.id));
+        assert!(remaining.iter().any(|n| n.title == "Other"));
+        assert!(
+            NotebookService::search_notes(&db, "unique findable", "content")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(NotebookService::list_trash(&db).unwrap().len(), 1);
+        assert!(!md.base().join("T.md").exists());
+        assert!(trash.join(format!("{}.md", note.id)).exists());
+
+        // Update on a trashed note is rejected.
+        let err = NotebookService::update_note(
+            &db,
+            &md,
+            UpdateNoteRequest {
+                id: note.id.clone(),
+                title: None,
+                content: Some("x".into()),
+                folder: None,
+                tags: None,
+            },
+        );
+        assert!(err.is_err());
+
+        // Restore: file back, searchable again, links recomputed.
+        let restored = NotebookService::restore_note(&db, &md, &note.id, &trash).unwrap();
+        assert_eq!(restored.title, "T");
+        assert!(md.read_note("T.md").unwrap().contains("unique findable"));
+        assert_eq!(
+            NotebookService::search_notes(&db, "unique findable", "content")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(NotebookService::list_trash(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn trash_purge_and_empty() {
+        let (db, md, dir) = test_env();
+        let trash = dir.0.join("trash");
+        let a = make_note(&db, &md, "A", "", "a");
+        let b = make_note(&db, &md, "B", "", "b");
+        NotebookService::trash_note(&db, &md, &a.id, &trash).unwrap();
+        NotebookService::trash_note(&db, &md, &b.id, &trash).unwrap();
+
+        NotebookService::purge_note(&db, &a.id, &trash).unwrap();
+        assert_eq!(NotebookService::list_trash(&db).unwrap().len(), 1);
+        assert!(NotebookService::purge_note(&db, &a.id, &trash).is_err()); // already purged
+
+        let purged = NotebookService::empty_trash(&db, &trash).unwrap();
+        assert_eq!(purged, 1);
+        assert!(NotebookService::list_trash(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn trash_folder_soft_deletes_subtree() {
+        let (db, md, dir) = test_env();
+        let trash = dir.0.join("trash");
+        make_note(&db, &md, "A", "gone", "a");
+        make_note(&db, &md, "B", "gone/deep", "b");
+        make_note(&db, &md, "C", "stay", "c");
+
+        NotebookService::delete_folder(&db, &md, "gone", &trash).unwrap();
+        assert!(!md.base().join("gone").exists());
+        assert_eq!(NotebookService::list_trash(&db).unwrap().len(), 2);
+        // The staying note is untouched.
+        assert_eq!(
+            NotebookService::list_notes(&db, &md, "stay").unwrap().len(),
+            1
+        );
+
+        // Restoring a subtree note brings the file back to its nested path.
+        let trashed: Vec<_> = NotebookService::list_trash(&db).unwrap();
+        let deep = trashed.iter().find(|t| t.title == "B").unwrap();
+        let restored = NotebookService::restore_note(&db, &md, &deep.id, &trash).unwrap();
+        assert_eq!(restored.folder, "gone/deep");
+        assert!(md.base().join("gone").join("deep").join("B.md").exists());
+    }
+
+    #[test]
+    fn note_links_panel_data() {
+        let (db, md, _dir) = test_env();
+        let a = make_note(&db, &md, "A", "", "see [[B]] and [[Missing]]");
+        let b = make_note(&db, &md, "B", "", "back to [[A]]");
+        // A was created before B existed; touch A so its [[B]] link resolves.
+        NotebookService::update_note(
+            &db,
+            &md,
+            UpdateNoteRequest {
+                id: a.id.clone(),
+                title: None,
+                content: Some("see [[B]] and [[Missing]]".into()),
+                folder: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+
+        let links = NotebookService::get_note_links(&db, &md, &a.id).unwrap();
+        assert_eq!(links.backlinks.len(), 1);
+        assert_eq!(links.backlinks[0].title, "B");
+        assert_eq!(links.outgoing.len(), 1);
+        assert_eq!(links.outgoing[0].title, "B");
+        assert_eq!(links.unresolved, vec!["Missing".to_string()]);
+
+        let links_b = NotebookService::get_note_links(&db, &md, &b.id).unwrap();
+        assert_eq!(links_b.backlinks[0].title, "A");
+        assert!(links_b.unresolved.is_empty());
     }
 
     #[test]

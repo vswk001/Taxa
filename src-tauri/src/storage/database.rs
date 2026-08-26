@@ -97,6 +97,9 @@ impl Database {
         // Migration: add priority column to pre-existing llm_providers tables.
         self.ensure_column("llm_providers", "priority", "INTEGER DEFAULT 0")?;
 
+        // Migration: soft-delete support (trash). NULL = live note.
+        self.ensure_column("notes", "deleted_at", "TEXT")?;
+
         // Migration: the key column used to be named as if it were encrypted;
         // rename it to describe what it actually holds (the keyring is primary,
         // this column is the durable fallback).

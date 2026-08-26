@@ -13,6 +13,8 @@ pub struct AppState {
     pub ai_engine: RwLock<crate::ai::engine::AiEngine>,
     /// Cancellation flags for in-flight AI requests, keyed by frontend seq.
     ai_cancels: Mutex<HashMap<u32, Arc<AtomicBool>>>,
+    /// Currently registered quick-capture accelerator, if any.
+    pub quick_capture_shortcut: Mutex<Option<String>>,
 }
 
 /// Lock the DB, mapping poisoning to an AppError instead of panicking.
@@ -42,6 +44,7 @@ impl AppState {
             data_dir,
             ai_engine,
             ai_cancels: Mutex::new(HashMap::new()),
+            quick_capture_shortcut: Mutex::new(None),
         })
     }
 
@@ -50,6 +53,18 @@ impl AppState {
             .join("notebooks")
             .join("default")
             .join("notes")
+    }
+
+    pub fn attachments_dir(&self) -> PathBuf {
+        self.data_dir
+            .join("notebooks")
+            .join("default")
+            .join("attachments")
+    }
+
+    /// Soft-deleted note files live here as `<note-id>.md` until purged.
+    pub fn trash_dir(&self) -> PathBuf {
+        self.data_dir.join("trash")
     }
 
     /// Register a cancellation flag for a request sequence.

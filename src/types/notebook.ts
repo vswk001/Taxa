@@ -52,3 +52,23 @@ export interface SearchResult {
   snippet: string;
   rank: number;
 }
+
+export interface TrashItem {
+  id: string;
+  title: string;
+  folder: string;
+  deleted_at: string;
+}
+
+export interface NoteLinkItem {
+  id: string;
+  title: string;
+  folder: string;
+  context: string;
+}
+
+export interface NoteLinks {
+  backlinks: NoteLinkItem[];
+  outgoing: NoteLinkItem[];
+  unresolved: string[];
+}

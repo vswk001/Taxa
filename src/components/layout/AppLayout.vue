@@ -64,6 +64,7 @@ import AiSidebar from '@/components/ai/AiSidebar.vue';
 import SearchPanel from '@/components/search/SearchPanel.vue';
 import GraphView from '@/components/graph/GraphView.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
+import { loadQuickCaptureSettings, applyQuickCaptureShortcut } from '@/composables/useQuickCapture';
 
 const { t } = useI18n();
 const notebookStore = useNotebookStore();
@@ -92,6 +93,10 @@ function handleKeyboard(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyboard);
+  // Register the global quick-capture hotkey (main window only).
+  applyQuickCaptureShortcut(loadQuickCaptureSettings()).catch((e) =>
+    console.error('quick-capture shortcut registration failed:', e),
+  );
 });
 onUnmounted(() => document.removeEventListener('keydown', handleKeyboard));
 </script>

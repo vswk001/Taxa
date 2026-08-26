@@ -1,11 +1,16 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
+import QuickCapture from './components/capture/QuickCapture.vue';
 import { useTheme } from './composables/useTheme';
 import i18n from './i18n';
 import './styles/global.css';
 
-const app = createApp(App);
+// The quick-capture window loads the same bundle with #quick-capture; it
+// mounts a tiny standalone root instead of the full app layout.
+const isQuickCapture = window.location.hash === '#quick-capture';
+
+const app = createApp(isQuickCapture ? QuickCapture : App);
 app.use(createPinia());
 app.use(i18n);
 useTheme();

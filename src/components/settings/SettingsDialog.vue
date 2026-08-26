@@ -47,6 +47,22 @@
                 <option v-for="loc in supportedLocales" :key="loc.value" :value="loc.value">{{ loc.label }}</option>
               </select>
             </div>
+            <div class="section-title" style="margin-top: 24px;">{{ t('settings.quickCapture') }}</div>
+            <div class="setting-item">
+              <span class="setting-label">{{ t('settings.quickCaptureEnable') }}</span>
+              <input type="checkbox" v-model="quickCapture.enabled" @change="saveQuickCapture" />
+            </div>
+            <div class="setting-item">
+              <span class="setting-label">{{ t('settings.quickCaptureShortcut') }}</span>
+              <input
+                class="shortcut-input"
+                v-model="quickCapture.accelerator"
+                :disabled="!quickCapture.enabled"
+                :placeholder="defaultAccelerator"
+                @change="saveQuickCapture"
+              />
+            </div>
+            <p class="setting-hint">{{ t('settings.quickCaptureHint') }}</p>
           </div>
 
           <!-- LLM 配置 -->
@@ -136,6 +152,12 @@ import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { setLocale, SUPPORTED_LOCALES } from '@/i18n';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTheme } from '@/composables/useTheme';
+import {
+  loadQuickCaptureSettings,
+  saveQuickCaptureSettings,
+  applyQuickCaptureShortcut,
+  DEFAULT_ACCELERATOR,
+} from '@/composables/useQuickCapture';
 import type { LlmProvider } from '@/types/settings';
 import { useProviderDrag } from '@/composables/useProviderDrag';
 import { useUpdater } from '@/composables/useUpdater';
@@ -164,6 +186,8 @@ onMounted(async () => {
 });
 
 const activeTab = ref('general');
+const quickCapture = ref(loadQuickCaptureSettings());
+const defaultAccelerator = DEFAULT_ACCELERATOR;
 const showForm = ref(false);
 const editingProvider = ref<LlmProvider | null>(null);
 const localTheme = ref<'light' | 'dark' | 'system'>(settingsStore.theme);
@@ -206,6 +230,15 @@ watch(() => props.visible, (v) => {
 
 function handleThemeChange() {
   setTheme(localTheme.value);
+}
+
+async function saveQuickCapture() {
+  saveQuickCaptureSettings(quickCapture.value);
+  try {
+    await applyQuickCaptureShortcut(quickCapture.value);
+  } catch (e) {
+    console.error('failed to apply quick-capture shortcut:', e);
+  }
 }
 
 function handleLangChange() {
@@ -314,6 +347,27 @@ async function setDefault(id: string) {
 .theme-option:hover { border-color: var(--accent-color); }
 .theme-option.active { border-color: var(--accent-color); color: var(--accent-color); background: rgba(74,144,217,0.08); }
 .theme-option input { display: none; }
+
+.shortcut-input {
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  width: 160px;
+}
+
+.shortcut-input:disabled {
+  opacity: 0.5;
+}
+
+.setting-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+  opacity: 0.8;
+}
 
 .lang-select {
   padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px;

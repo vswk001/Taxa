@@ -19,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let data_dir = get_data_dir()?;
             std::fs::create_dir_all(data_dir.join("notebooks").join("default").join("notes"))?;
@@ -71,6 +72,16 @@ pub fn run() {
             commands::notebook::list_notes,
             commands::notebook::get_folder_tree,
             commands::search::search_notes,
+            commands::notebook::list_trash,
+            commands::notebook::restore_note,
+            commands::notebook::purge_note,
+            commands::notebook::empty_trash,
+            commands::notebook::get_note_links,
+            commands::notebook::save_attachment,
+            commands::notebook::get_vault_info,
+            commands::capture::quick_capture,
+            commands::capture::set_quick_capture_shortcut,
+            commands::capture::hide_quick_capture,
             commands::notebook::create_folder,
             commands::notebook::rename_folder,
             commands::notebook::delete_folder,
@@ -84,6 +95,7 @@ pub fn run() {
             commands::ai::ai_enrich_note,
             commands::ai::ai_test_provider,
             commands::ai::ai_cancel,
+            commands::ai::ai_ask_notes,
             commands::settings::list_providers,
             commands::settings::save_provider,
             commands::settings::delete_provider,

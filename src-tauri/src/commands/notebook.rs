@@ -4,6 +4,7 @@ use crate::notebook::model::*;
 use crate::notebook::service::NotebookService;
 use crate::state::{lock_db, AppState};
 use crate::storage::markdown::{sanitize_filename, MarkdownStorage};
+use base64::Engine as _;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -53,13 +54,67 @@ pub async fn update_note(
     .await
 }
 
+/// Soft-delete: the note moves to the trash and stays restorable.
 #[tauri::command]
 pub async fn delete_note(state: State<'_, Arc<AppState>>, id: String) -> AppResult<()> {
     let state = state.inner().clone();
     run_blocking(move || {
         let db = lock_db(&state)?;
         let md = MarkdownStorage::new(state.notes_dir());
-        NotebookService::delete_note(&db, &md, &id)
+        NotebookService::trash_note(&db, &md, &id, &state.trash_dir())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn list_trash(state: State<'_, Arc<AppState>>) -> AppResult<Vec<TrashItem>> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        NotebookService::list_trash(&db)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn restore_note(state: State<'_, Arc<AppState>>, id: String) -> AppResult<Note> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::restore_note(&db, &md, &id, &state.trash_dir())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn purge_note(state: State<'_, Arc<AppState>>, id: String) -> AppResult<()> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        NotebookService::purge_note(&db, &id, &state.trash_dir())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn empty_trash(state: State<'_, Arc<AppState>>) -> AppResult<usize> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        NotebookService::empty_trash(&db, &state.trash_dir())
+    })
+    .await
+}
+
+/// Backlinks / outgoing links / unresolved [[targets]] for the panel.
+#[tauri::command]
+pub async fn get_note_links(state: State<'_, Arc<AppState>>, id: String) -> AppResult<NoteLinks> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let db = lock_db(&state)?;
+        let md = MarkdownStorage::new(state.notes_dir());
+        NotebookService::get_note_links(&db, &md, &id)
     })
     .await
 }
@@ -132,7 +187,7 @@ pub async fn delete_folder(state: State<'_, Arc<AppState>>, path: String) -> App
     run_blocking(move || {
         let db = lock_db(&state)?;
         let md = MarkdownStorage::new(state.notes_dir());
-        NotebookService::delete_folder(&db, &md, &path)
+        NotebookService::delete_folder(&db, &md, &path, &state.trash_dir())
     })
     .await
 }
@@ -315,6 +370,62 @@ pub async fn export_folder(
             }
         }
         Ok(true)
+    })
+    .await
+}
+
+/// Allowed attachment extensions (images only for v1).
+const ATTACHMENT_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"];
+
+/// Save an attachment (base64) under the notebook's attachments dir and
+/// return the vault-relative path to embed in markdown.
+#[tauri::command]
+pub async fn save_attachment(
+    state: State<'_, Arc<AppState>>,
+    file_name: String,
+    data: String,
+) -> AppResult<String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let ext = file_name
+            .rsplit('.')
+            .next()
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if !ATTACHMENT_EXTS.contains(&ext.as_str()) {
+            return Err(AppError::InvalidPath(format!(
+                "unsupported attachment type: .{ext}"
+            )));
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data.as_bytes())
+            .map_err(|e| AppError::Serialization(format!("invalid base64: {e}")))?;
+        let attachments = state.attachments_dir();
+        std::fs::create_dir_all(&attachments)?;
+        let name = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+        std::fs::write(attachments.join(&name), bytes)?;
+        Ok(format!("attachments/{name}"))
+    })
+    .await
+}
+
+/// Absolute paths the frontend needs (asset URLs for images).
+#[derive(serde::Serialize)]
+pub struct VaultInfo {
+    pub notes_dir: String,
+    pub attachments_dir: String,
+    pub trash_dir: String,
+}
+
+#[tauri::command]
+pub async fn get_vault_info(state: State<'_, Arc<AppState>>) -> AppResult<VaultInfo> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        Ok(VaultInfo {
+            notes_dir: state.notes_dir().to_string_lossy().to_string(),
+            attachments_dir: state.attachments_dir().to_string_lossy().to_string(),
+            trash_dir: state.trash_dir().to_string_lossy().to_string(),
+        })
     })
     .await
 }

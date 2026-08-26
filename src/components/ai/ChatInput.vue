@@ -11,14 +11,14 @@
     <div class="chat-input">
       <textarea
         v-model="text"
-        :placeholder="props.mode === 'optimize' ? t('ai.optimizePlaceholder') : t('ai.inputPlaceholder')"
+        :placeholder="props.mode === 'optimize' ? t('ai.optimizePlaceholder') : props.mode === 'ask' ? t('ai.askPlaceholder') : t('ai.inputPlaceholder')"
         :disabled="disabled"
         @keydown.enter.exact.prevent="submit"
         @drop.prevent="handleDrop"
         @paste="handlePaste"
       />
       <div class="input-actions">
-        <button v-if="props.mode !== 'optimize'" class="attach-btn" :disabled="disabled" @click="pickFile" :title="t('ai.uploadFile')">
+        <button v-if="props.mode === 'organize'" class="attach-btn" :disabled="disabled" @click="pickFile" :title="t('ai.uploadFile')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
         </button>
         <button class="send-btn" :disabled="disabled || (!text.trim() && !attachments.length)" @click="submit">
@@ -39,7 +39,7 @@ import type { FileAttachment } from '@/types/ai';
 const { t } = useI18n();
 const MAX_FILE_CHARS = 50000;
 
-const props = defineProps<{ disabled: boolean; mode: 'organize' | 'optimize' }>();
+const props = defineProps<{ disabled: boolean; mode: 'organize' | 'optimize' | 'ask' }>();
 const emit = defineEmits<{ submit: [content: string, attachments: FileAttachment[]] }>();
 const text = ref('');
 const attachments = ref<FileAttachment[]>([]);
@@ -103,7 +103,7 @@ function handlePaste(e: ClipboardEvent) {
 
 // Attachments have no effect in optimize mode — don't keep them around.
 watch(() => props.mode, (m) => {
-  if (m === 'optimize') attachments.value = [];
+  if (m !== 'organize') attachments.value = [];
 });
 
 function submit() {

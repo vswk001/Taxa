@@ -76,6 +76,21 @@ impl AiEngine {
         }
     }
 
+    pub async fn ask_notes(
+        providers: &[ProviderConfig],
+        question: &str,
+        notes_context: &str,
+        on_event: StreamCallback,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<String> {
+        let user_on_event: Option<StreamCallback> = Some(on_event);
+        Self::try_providers(providers, &user_on_event, cancel, |config, cb, cancel| {
+            AiOrganizer::ask_notes(config, question, notes_context, cb, cancel, locale)
+        })
+        .await
+    }
+
     fn notify_fallback(
         on_event: &Option<StreamCallback>,
         failed: &ProviderConfig,

@@ -106,6 +106,135 @@ async fn ai_process_input_inner(
     .await
 }
 
+#[derive(serde::Serialize)]
+pub struct AskSource {
+    pub id: String,
+    pub title: String,
+    pub folder: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct AskResult {
+    pub answer: String,
+    pub sources: Vec<AskSource>,
+}
+
+/// RAG Q&A: search notes for the question, feed excerpts to the LLM, stream
+/// the grounded answer back.
+#[tauri::command]
+pub async fn ai_ask_notes(
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+    question: String,
+    seq: u32,
+    locale: String,
+) -> AppResult<AskResult> {
+    let cancel = state.register_cancel(seq);
+    let result = ai_ask_notes_inner(&state, &app, &question, seq, &locale, cancel.clone()).await;
+    state.unregister_cancel(seq);
+    result
+}
+
+async fn ai_ask_notes_inner(
+    state: &Arc<AppState>,
+    app: &AppHandle,
+    question: &str,
+    seq: u32,
+    locale: &str,
+    cancel: crate::ai::provider::CancelToken,
+) -> AppResult<AskResult> {
+    // Gather relevant notes (blocking): search + read contents.
+    let md = MarkdownStorage::new(state.notes_dir());
+    let question_owned = question.to_string();
+    let gathered = {
+        let state = state.clone();
+        crate::commands::notebook::run_blocking(move || {
+            let db = lock_db(&state)?;
+            let results = crate::notebook::service::NotebookService::search_notes(
+                &db,
+                &question_owned,
+                "all",
+            )
+            .unwrap_or_default();
+            let mut sources = Vec::new();
+            let mut blocks = Vec::new();
+            for r in results.iter().take(8) {
+                if !md.full_path(&r.path).exists() {
+                    continue;
+                }
+                if let Ok(content) = md.read_note(&r.path) {
+                    let excerpt: String = content.chars().take(4000).collect();
+                    blocks.push(format!(
+                        "--- 笔记: {} ---
+{}",
+                        r.title, excerpt
+                    ));
+                    sources.push(AskSource {
+                        id: r.id.clone(),
+                        title: r.title.clone(),
+                        folder: String::new(),
+                    });
+                }
+            }
+            if sources.is_empty() {
+                return Ok((String::new(), sources));
+            }
+            Ok((
+                blocks.join(
+                    "
+
+",
+                ),
+                sources,
+            ))
+        })
+        .await?
+    };
+    let (context, mut sources) = gathered;
+
+    let providers = state.ai_engine.read().await.get_providers_in_order();
+    let app_handle = app.clone();
+    let on_event = Arc::new(move |event: StreamEvent| {
+        let _ = app_handle.emit(
+            "ai-stream",
+            serde_json::json!({ "seq": seq, "event": event }),
+        );
+    });
+
+    let answer = crate::ai::engine::AiEngine::ask_notes(
+        &providers, question, &context, on_event, cancel, locale,
+    )
+    .await?;
+
+    // Fill folder names for the sources (one query).
+    if !sources.is_empty() {
+        let state = state.clone();
+        let map = crate::commands::notebook::run_blocking(move || {
+            let db = lock_db(&state)?;
+            let mut map = std::collections::HashMap::new();
+            let mut stmt = db
+                .conn()
+                .prepare("SELECT id, folder FROM notes WHERE deleted_at IS NULL")?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            for (id, folder) in rows.flatten() {
+                map.insert(id, folder);
+            }
+            Ok(map)
+        })
+        .await
+        .unwrap_or_default();
+        for source in &mut sources {
+            if let Some(folder) = map.get(&source.id) {
+                source.folder = folder.clone();
+            }
+        }
+    }
+
+    Ok(AskResult { answer, sources })
+}
+
 /// Abort an in-flight AI request (user pressed stop / the UI timed out).
 #[tauri::command]
 pub async fn ai_cancel(state: State<'_, Arc<AppState>>, seq: u32) -> AppResult<()> {

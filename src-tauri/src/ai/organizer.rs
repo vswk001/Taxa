@@ -164,6 +164,29 @@ impl AiOrganizer {
             .map_err(|e| parse_error("AI 返回格式错误", &e, &response.content))
     }
 
+    /// Q&A over notes: streams reasoning + answer, returns the raw answer
+    /// text (no JSON envelope to parse).
+    pub async fn ask_notes(
+        config: ProviderConfig,
+        question: &str,
+        notes_context: &str,
+        on_event: Option<StreamCallback>,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<String> {
+        let provider = create_provider(&config)?;
+        let messages = PromptTemplates::ask_notes(question, notes_context, locale);
+        let options = ChatOptions {
+            max_tokens: 4096,
+            ..ChatOptions::default()
+        };
+        let response = match on_event {
+            Some(cb) => provider.chat_stream(messages, options, cb, cancel).await?,
+            None => provider.chat(messages, options).await?,
+        };
+        Ok(response.content)
+    }
+
     pub fn apply_create(
         db: &Database,
         md: &MarkdownStorage,

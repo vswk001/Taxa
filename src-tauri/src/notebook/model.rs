@@ -55,3 +55,29 @@ pub struct SearchResult {
     pub snippet: String,
     pub rank: f64,
 }
+
+/// A soft-deleted note shown in the trash view.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrashItem {
+    pub id: String,
+    pub title: String,
+    pub folder: String,
+    pub deleted_at: String,
+}
+
+/// One resolved wiki link, as shown in the backlinks panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteLinkItem {
+    pub id: String,
+    pub title: String,
+    pub folder: String,
+    pub context: String,
+}
+
+/// Backlinks / outgoing links / unresolved targets for one note.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteLinks {
+    pub backlinks: Vec<NoteLinkItem>,
+    pub outgoing: Vec<NoteLinkItem>,
+    pub unresolved: Vec<String>,
+}
