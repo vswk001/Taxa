@@ -221,5 +221,6 @@ export default {
     working: 'Läuft…',
     organized: 'Von der KI sortiert',
     savedToInbox: 'In Inbox gespeichert',
+    registerFailed: 'Registrierung der Erfassungstaste fehlgeschlagen',
   },
 };

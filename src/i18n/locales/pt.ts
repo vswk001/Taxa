@@ -221,5 +221,6 @@ export default {
     working: 'Processando…',
     organized: 'Organizado pela IA',
     savedToInbox: 'Salvo na Inbox',
+    registerFailed: 'Falha ao registrar o atalho de captura',
   },
 };

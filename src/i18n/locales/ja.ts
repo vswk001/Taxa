@@ -221,5 +221,6 @@ export default {
     working: '処理中…',
     organized: 'AI が整理しました',
     savedToInbox: 'Inbox に保存しました',
+    registerFailed: 'クイックキャプチャのホットキー登録に失敗しました',
   },
 };

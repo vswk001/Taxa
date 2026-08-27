@@ -221,5 +221,6 @@ export default {
     working: '處理中…',
     organized: 'AI 已整理',
     savedToInbox: '已存入 Inbox',
+    registerFailed: '快捷擷取熱鍵註冊失敗',
   },
 };

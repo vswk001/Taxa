@@ -221,5 +221,6 @@ export default {
     working: 'جارٍ المعالجة…',
     organized: 'نظّمه الذكاء الاصطناعي',
     savedToInbox: 'حُفظ في Inbox',
+    registerFailed: 'فشل تسجيل مفتاح الالتقاط السريع',
   },
 };

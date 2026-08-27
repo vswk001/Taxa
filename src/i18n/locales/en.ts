@@ -221,5 +221,6 @@ export default {
     working: 'Working...',
     organized: 'Organized by AI',
     savedToInbox: 'Saved to Inbox',
+    registerFailed: 'Quick capture hotkey registration failed',
   },
 };

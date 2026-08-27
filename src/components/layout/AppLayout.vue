@@ -93,10 +93,21 @@ function handleKeyboard(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyboard);
-  // Register the global quick-capture hotkey (main window only).
-  applyQuickCaptureShortcut(loadQuickCaptureSettings()).catch((e) =>
-    console.error('quick-capture shortcut registration failed:', e),
-  );
+  // Register the global quick-capture hotkey (main window only). A visible
+  // error matters here: a stale second dev instance holding the shortcut
+  // otherwise looks like "the hotkey is dead".
+  applyQuickCaptureShortcut(loadQuickCaptureSettings()).catch(async (e) => {
+    console.error('quick-capture shortcut registration failed:', e);
+    try {
+      const { message } = await import('@tauri-apps/plugin-dialog');
+      await message(String(e instanceof Error ? e.message : e), {
+        title: t('quickCapture.registerFailed'),
+        kind: 'error',
+      });
+    } catch {
+      /* dialog unavailable in this context */
+    }
+  });
 });
 onUnmounted(() => document.removeEventListener('keydown', handleKeyboard));
 </script>

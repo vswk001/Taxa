@@ -221,5 +221,6 @@ export default {
     working: 'Procesando…',
     organized: 'Organizado por IA',
     savedToInbox: 'Guardado en Inbox',
+    registerFailed: 'Error al registrar el atajo de captura rápida',
   },
 };

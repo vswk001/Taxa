@@ -42,8 +42,19 @@ const doneText = computed(() =>
   organized.value ? t('quickCapture.organized') : t('quickCapture.savedToInbox'),
 );
 
-function hide() {
-  void getCurrentWindow().hide();
+async function hide() {
+  try {
+    await getCurrentWindow().hide();
+  } catch (e) {
+    // The capability may block the JS window API; the backend command
+    // hides via Rust, which needs no window permission.
+    console.warn('window.hide() failed, falling back to backend:', e);
+    try {
+      await invoke('hide_quick_capture');
+    } catch (e2) {
+      console.error('backend hide also failed:', e2);
+    }
+  }
 }
 
 /** Bound the backend call: a stuck LLM attempt must not freeze the window

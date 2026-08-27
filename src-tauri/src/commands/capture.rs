@@ -54,22 +54,42 @@ fn set_stored_shortcut(state: &AppState, value: Option<String>) {
 }
 
 fn toggle_quick_capture(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(QUICK_CAPTURE_WINDOW) {
-        if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
-        } else {
-            let _ = window.show();
-            let _ = window.set_focus();
-            let _ = window.center();
+    match app.get_webview_window(QUICK_CAPTURE_WINDOW) {
+        Some(window) => {
+            let visible = window.is_visible();
+            eprintln!(
+                "[quick-capture] toggle: window found, is_visible={:?}",
+                visible
+            );
+            let visible = visible.unwrap_or(false);
+            if visible {
+                if let Err(e) = window.hide() {
+                    eprintln!("[quick-capture] hide failed: {e}");
+                }
+            } else if let Err(e) = window
+                .show()
+                .and_then(|_| window.set_focus())
+                .and_then(|_| window.center())
+            {
+                eprintln!("[quick-capture] show failed: {e}");
+            }
         }
+        None => eprintln!("[quick-capture] toggle: window '{QUICK_CAPTURE_WINDOW}' not found"),
     }
 }
 
 /// Hide the quick-capture window (called by its Esc handler / after submit).
+/// Rust-side window ops need no capability, so this works even when the
+/// frontend's own window.hide() is permission-blocked.
 #[tauri::command]
 pub async fn hide_quick_capture(app: AppHandle) -> AppResult<()> {
-    if let Some(window) = app.get_webview_window(QUICK_CAPTURE_WINDOW) {
-        let _ = window.hide();
+    match app.get_webview_window(QUICK_CAPTURE_WINDOW) {
+        Some(window) => {
+            if let Err(e) = window.hide() {
+                eprintln!("[quick-capture] hide_quick_capture failed: {e}");
+            }
+        }
+        None => eprintln!("[quick-capture] hide_quick_capture: window not found"),
     }
     Ok(())
 }

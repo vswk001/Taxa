@@ -221,5 +221,6 @@ export default {
     working: 'Traitement…',
     organized: "Organisé par l'IA",
     savedToInbox: 'Enregistré dans Inbox',
+    registerFailed: "Échec de l'enregistrement du raccourci de capture",
   },
 };
