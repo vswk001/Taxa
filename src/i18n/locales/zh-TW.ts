@@ -214,6 +214,7 @@ export default {
     restoreFailed: '還原筆記失敗',
   },
   quickCapture: {
+    title: '快捷擷取',
     placeholder: '隨手記錄…送出後 AI 會自動整理',
     hint: 'Ctrl+Enter 送出 / Esc 隱藏',
     submit: '擷取',

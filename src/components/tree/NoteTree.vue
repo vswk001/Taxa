@@ -92,6 +92,7 @@ import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import TreeNode from './TreeNode.vue';
 import InputDialog from '@/components/common/InputDialog.vue';
@@ -378,14 +379,21 @@ function onDocKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape' && contextMenu.value.show) contextMenu.value.show = false;
 }
 
-onMounted(() => {
+let notesChangedUnlisten: UnlistenFn | null = null;
+
+onMounted(async () => {
   document.addEventListener('pointerdown', onDocPointerDown, true);
   document.addEventListener('keydown', onDocKeyDown, true);
+  // Quick capture (and future cross-window writers) tell us to refresh.
+  notesChangedUnlisten = await listen('notes-changed', () => {
+    void notebookStore.loadFolderTree().then(() => notebookStore.loadAllNotes());
+  });
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointerDown, true);
   document.removeEventListener('keydown', onDocKeyDown, true);
+  notesChangedUnlisten?.();
 });
 </script>
 

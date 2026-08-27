@@ -9,7 +9,7 @@ use crate::error::AppResult;
 use crate::state::{lock_db, AppState};
 use crate::storage::markdown::MarkdownStorage;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub const QUICK_CAPTURE_WINDOW: &str = "quick-capture";
@@ -80,6 +80,7 @@ pub async fn hide_quick_capture(app: AppHandle) -> AppResult<()> {
 /// ever lost. Returns the note id so the capture window can show feedback.
 #[tauri::command]
 pub async fn quick_capture(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     content: String,
     locale: String,
@@ -119,7 +120,10 @@ pub async fn quick_capture(
         if let Ok((folder_structure, related_json)) = context {
             let cancel: CancelToken = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let noop = Arc::new(|_event: StreamEvent| {});
-            let result = AiEngine::process_input_stream(
+            // A capture must feel instant: bound the whole AI attempt so a
+            // slow or unreachable provider falls back to the Inbox quickly
+            // instead of hanging the capture window for minutes.
+            let attempt = AiEngine::process_input_stream(
                 &providers,
                 &content,
                 &folder_structure,
@@ -127,11 +131,13 @@ pub async fn quick_capture(
                 noop,
                 cancel.clone(),
                 &locale,
-            )
-            .await;
+            );
+            let result = tokio::time::timeout(std::time::Duration::from_secs(60), attempt)
+                .await
+                .ok(); // a timeout falls through to the Inbox fallback
             if err_if_cancelled(&cancel).is_err() {
                 // fall through to inbox
-            } else if let Ok(result) = result {
+            } else if let Some(Ok(result)) = result {
                 if result.complexity == "simple" {
                     let state = state.inner().clone();
                     let applied = crate::commands::notebook::run_blocking(move || {
@@ -152,6 +158,7 @@ pub async fn quick_capture(
                     })
                     .await;
                     if let Ok(note) = applied {
+                        let _ = app.emit("notes-changed", &note.id);
                         return Ok(note);
                     }
                 }
@@ -166,7 +173,7 @@ pub async fn quick_capture(
         .map(|l| l.chars().take(50).collect::<String>())
         .unwrap_or_else(|| "Capture".into());
     let state = state.inner().clone();
-    crate::commands::notebook::run_blocking(move || {
+    let note = crate::commands::notebook::run_blocking(move || {
         let db = lock_db(&state)?;
         let md = MarkdownStorage::new(state.notes_dir());
         crate::notebook::service::NotebookService::create_note(
@@ -180,5 +187,7 @@ pub async fn quick_capture(
             },
         )
     })
-    .await
+    .await?;
+    let _ = app.emit("notes-changed", &note.id);
+    Ok(note)
 }

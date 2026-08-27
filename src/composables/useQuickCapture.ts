@@ -6,7 +6,7 @@ export interface QuickCaptureSettings {
 }
 
 const STORAGE_KEY = 'taxa-quick-capture';
-export const DEFAULT_ACCELERATOR = 'Alt+Shift+T';
+export const DEFAULT_ACCELERATOR = 'Ctrl+Alt+N';
 
 export function loadQuickCaptureSettings(): QuickCaptureSettings {
   try {

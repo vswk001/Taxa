@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'ノートの復元に失敗しました',
   },
   quickCapture: {
+    title: 'クイックキャプチャ',
     placeholder: '思いついたことを…送信すると AI が整理します',
     hint: 'Ctrl+Enter で送信 / Esc で非表示',
     submit: 'キャプチャ',

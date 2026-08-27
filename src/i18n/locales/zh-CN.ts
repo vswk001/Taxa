@@ -214,6 +214,7 @@ export default {
     restoreFailed: '恢复笔记失败',
   },
   quickCapture: {
+    title: '快捷捕获',
     placeholder: '随手记录…提交后 AI 会自动整理',
     hint: 'Ctrl+Enter 提交 / Esc 隐藏',
     submit: '捕获',

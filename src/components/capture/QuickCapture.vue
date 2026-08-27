@@ -1,5 +1,9 @@
 <template>
-  <div class="quick-capture" @keydown="onKeyDown">
+  <div class="quick-capture">
+    <div class="title-bar">
+      <span class="title">{{ t('quickCapture.title') }}</span>
+      <button class="close" :title="t('common.close')" @click="hide">×</button>
+    </div>
     <textarea
       ref="inputRef"
       v-model="text"
@@ -7,6 +11,7 @@
       :placeholder="t('quickCapture.placeholder')"
       :disabled="busy"
       rows="6"
+      @keydown="onKeyDown"
     />
     <div class="capture-footer">
       <span class="hint">{{ t('quickCapture.hint') }}</span>
@@ -41,10 +46,27 @@ function hide() {
   void getCurrentWindow().hide();
 }
 
+/** Bound the backend call: a stuck LLM attempt must not freeze the window
+ *  (the backend independently falls back to the Inbox after its own cap). */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(t('ai.requestTimeout', { n: ms / 1000 }))), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     e.preventDefault();
     hide();
+    return;
+  }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    submit();
   }
 }
 
@@ -54,19 +76,23 @@ async function submit() {
   busy.value = true;
   status.value = 'idle';
   try {
-    const note = await invoke<{ title: string; folder: string }>('quick_capture', {
-      content,
-      locale: locale.value,
-    });
+    const note = await withTimeout(
+      invoke<{ title: string; folder: string }>('quick_capture', {
+        content,
+        locale: locale.value,
+      }),
+      90_000,
+    );
     organized.value = note.folder !== 'Inbox';
     status.value = 'done';
     text.value = '';
-    // Brief feedback, then hide until the next hotkey press.
     setTimeout(() => {
       status.value = 'idle';
       hide();
-    }, 1200);
+    }, 2200);
   } catch (e) {
+    // Keep the window open so the text is still in front of the user —
+    // never lose a capture to an error.
     status.value = 'error';
     errorText.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -88,6 +114,38 @@ onMounted(() => {
   border: 1px solid var(--border-color);
   border-radius: 10px;
   overflow: hidden;
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  user-select: none;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.close:hover {
+  color: var(--danger-color);
+  background: var(--bg-primary);
 }
 
 .capture-input {

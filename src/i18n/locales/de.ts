@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'Wiederherstellen fehlgeschlagen',
   },
   quickCapture: {
+    title: 'Schnellerfassung',
     placeholder: 'Schnell festhalten … die KI sortiert beim Senden',
     hint: 'Strg+Enter senden / Esc ausblenden',
     submit: 'Erfassen',

@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'Failed to restore note',
   },
   quickCapture: {
+    title: 'Quick Capture',
     placeholder: 'Capture anything... AI will organize it on submit',
     hint: 'Ctrl+Enter to submit / Esc to hide',
     submit: 'Capture',

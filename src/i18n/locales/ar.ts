@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'فشل استعادة الملاحظة',
   },
   quickCapture: {
+    title: 'الالتقاط السريع',
     placeholder: 'سجّل بسرعة… الذكاء الاصطناعي ينظمه عند الإرسال',
     hint: 'Ctrl+Enter للإرسال / Esc للإخفاء',
     submit: 'التقاط',

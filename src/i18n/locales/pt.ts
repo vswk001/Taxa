@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'Falha ao restaurar a nota',
   },
   quickCapture: {
+    title: 'Captura rápida',
     placeholder: 'Registre rápido… a IA organiza ao enviar',
     hint: 'Ctrl+Enter enviar / Esc ocultar',
     submit: 'Capturar',

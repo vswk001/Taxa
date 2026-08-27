@@ -214,6 +214,7 @@ export default {
     restoreFailed: 'Échec de la restauration',
   },
   quickCapture: {
+    title: 'Capture rapide',
     placeholder: "Notez vite… l'IA organise à l'envoi",
     hint: 'Ctrl+Entrée envoyer / Esc masquer',
     submit: 'Capturer',
