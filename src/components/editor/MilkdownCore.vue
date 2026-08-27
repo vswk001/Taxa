@@ -72,12 +72,19 @@ onMounted(() => {
 
 onBeforeUnmount(() => observer?.disconnect());
 
-async function insertAtCursor(text: string) {
+/** Insert an image by markdown path. The markdown is parsed first so the
+ *  document receives a real image node — inserting the raw "![](path)"
+ *  string as text leaves the path visible until the next full re-parse. */
+function insertImage(path: string) {
   const editor = getInstance();
   if (!editor || loading.value) return;
   editor.action((ctx) => {
     const view = ctx.get(editorViewCtx);
-    view.dispatch(view.state.tr.insertText(text).scrollIntoView());
+    const parser = ctx.get(parserCtx);
+    const doc = parser(`![](${path})`);
+    const img = doc?.content.firstChild?.firstChild;
+    if (!img || img.type.name !== 'image') return;
+    view.dispatch(view.state.tr.replaceSelectionWith(img).scrollIntoView());
     view.focus();
   });
 }
@@ -96,9 +103,7 @@ async function saveAndInsert(file: File) {
       fileName: file.name || 'image.png',
       data: base64,
     });
-    await insertAtCursor(`
-![](${path})
-`);
+    insertImage(path);
   } catch (e) {
     console.error('failed to save attachment:', e);
   }
