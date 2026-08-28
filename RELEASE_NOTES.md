@@ -1,44 +1,44 @@
-# Taxa v0.4.0
+# Taxa v0.4.1
 
-本次为大版本更新：五项新特性 + 快捷捕获问题的彻底修复。
+**[简体中文](#简体中文) | [English](#english)**
 
-## ✨ 新特性
+---
 
-### 1. 回收站（软删除）
-删除笔记或文件夹不再是不可逆操作。被删内容进入回收站，可随时恢复到原位置（路径、`[[链接]]`、全文搜索索引一并还原），也可彻底删除或一键清空。目录树工具栏新增回收站入口。
+## 简体中文
 
-### 2. 全局快捷捕获（Ctrl+Alt+N）
-在任何应用中按下 `Ctrl+Alt+N`，唤出一个置顶速记小窗。随手记录、Ctrl+Enter 提交后：AI 自动整理归档（选择新建或追加到相关笔记）；未配置 AI、请求失败或结果需确认时，原文自动落入 Inbox 文件夹并打上 `inbox` 标签——**内容永不丢失**。可在 设置 → 通用 中修改快捷键或关闭。提示：Linux(Wayland) 下全局快捷键依赖桌面环境支持。
+v0.4.0 的补丁版本，修复一个影响较大的界面问题。
 
-### 3. 图片附件
-在编辑器中直接粘贴或拖入图片：自动保存到本地附件目录，以可移植的相对路径嵌入 Markdown。换机器、同步文件夹都不会丢图。
+### 🐛 修复
 
-### 4. 反向链接面板
-笔记头部新增链接按钮，一键查看：**谁链接了我**（反向链接）、**我链接了谁**（正向链接）、**未解析链接**（指向不存在笔记的 `[[标题]]`，点击即在同文件夹创建）。
+- **笔记树右键菜单所有功能失效**：点击菜单项（重命名、移动、删除、导入、导出等）没有任何反应。根因是"点击菜单外部自动关闭"的监听器在捕获阶段先行把菜单从界面移除，导致后续的点击事件无目标可达。现在点击菜单内部会正常执行操作，点击外部和 Esc 关闭行为不变。
 
-### 5. AI 问答（RAG）
-AI 助手新增「问答」模式：基于你自己的笔记回答问题——自动检索最相关的笔记作为依据，流式输出回答与思考过程，回答下方附引用来源（点击直达笔记）。笔记里没有的内容会明确说明，不编造。
+### 🔄 升级建议
 
-## 🐛 重要修复（自 v0.3.0）
+- **从 v0.3.x 或更早版本升级**：直接下载下方安装包覆盖安装。
+- **已安装 v0.4.0**：在应用内 设置 → 关于 → 检查更新，可直接升级到本版本。
 
-- **快捷捕获窗口无法关闭**：前端窗口操作被 Tauri 权限系统静默拦截（`core:window:default` 不含 hide 权限），Esc/关闭按钮/自动隐藏全部失效。已补全权限并增加后端兜底路径，全部关闭方式经黑盒验证可用。
-- **全局快捷键与中文输入法冲突**：默认快捷键由 `Alt+Shift+T` 改为 `Ctrl+Alt+N`（Alt+Shift 是 Windows 输入语言切换键）。
-- **捕获后主界面无变化**：捕获写入后主窗口现在实时刷新目录树。
-- **捕获窗口卡死风险**：AI 请求增加 60/90 秒双层超时，超时自动落 Inbox；无边框窗口补充了明确的关闭按钮。
-- **粘贴图片显示路径文本**：改为直接插入解析后的图片节点。
-- **反向链接面板显示原始 key**：i18n 键插错区块，已修正 9 种语言。
-- **Windows 发版构建失败**（重复 manifest 资源）与 **Linux 路径校验测试失败**：已修复。
-- CI 现于 master 分支推送时正确触发；快捷键注册失败会弹窗提示（不再静默）。
+---
 
-## 📦 安装
+## English
 
-| 平台 | 资产 |
+A patch release for v0.4.0 fixing a significant UI regression.
+
+### 🐛 Fixed
+
+- **All note-tree context menu actions were dead**: clicking menu items (rename, move, delete, import, export, etc.) did nothing. Root cause: the "close the menu when clicking outside" listener ran in the capture phase and removed the menu from the DOM before the item's click event could reach it. Clicks inside the menu now execute normally; clicking outside and pressing Escape still close it.
+
+### 🔄 Upgrading
+
+- **From v0.3.x or earlier**: download an installer below and install over your existing setup.
+- **On v0.4.0**: open Settings → About → Check for Updates to upgrade in-app.
+
+---
+
+### 📦 安装 / Downloads
+
+| 平台 / Platform | 资产 / Asset |
 |---|---|
-| Windows | `Taxa_0.4.0_x64-setup.exe` / `.msi` |
-| macOS (Apple Silicon + Intel) | `Taxa_0.4.0_universal.dmg` |
+| Windows | `Taxa_0.4.1_x64-setup.exe` / `.msi` |
+| macOS (Apple Silicon + Intel) | `Taxa_0.4.1_universal.dmg` |
 | Linux | `.AppImage` / `.deb` / `.rpm` |
-| MCP 服务器 | `taxa-mcp-*`（三平台独立二进制，接入 Claude Code 等工具见文档） |
-
-## 🔄 更新说明
-
-本版起使用新的更新签名密钥。此前通过安装包安装的用户请直接下载上方安装包覆盖安装；本版及之后的版本将支持应用内检查更新（若已配置签名密钥则可静默更新）。
+| MCP 服务器 / MCP server | `taxa-mcp-*` |

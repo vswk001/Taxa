@@ -4084,7 +4084,7 @@ dependencies = [
 
 [[package]]
 name = "taxa"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -4114,7 +4114,7 @@ dependencies = [
 
 [[package]]
 name = "taxa-mcp"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dirs 5.0.1",
  "rusqlite",
