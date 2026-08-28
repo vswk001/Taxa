@@ -33,7 +33,12 @@ It also ships an **MCP server**, so tools like Claude Code and Codex can search 
   - *Polish* — optimize and rewrite an existing note on instruction.
 - **Multi-provider LLM** — configure several providers and let Taxa automatically fall back between them. Drag to set the fallback order. Streaming with reasoning shown.
 - **MCP knowledge base** — expose your notes as a knowledge base over the Model Context Protocol, so AI coding assistants can search and read them as context.
-- **Full-text search** — FTS5-backed search across titles, tags, and content.
+- **Full-text search** — FTS5-backed (trigram, CJK-friendly) search across titles, tags, and content with highlighted snippets.
+- **Trash** — soft delete with restore; nothing is ever lost by accident.
+- **Global quick capture** — press `Ctrl+Alt+N` anywhere to jot something down; the AI files it (or it lands in your Inbox).
+- **Image attachments** — paste/drop images straight into notes, stored locally with portable relative paths.
+- **Backlinks panel** — see what links to the current note, what it links to, and create unresolved `[[targets]]` in one click.
+- **Ask your notes (RAG)** — a Q&A mode that answers from your own notes with cited sources.
 - **Note graph** — `[[wikilink]]` notes together and explore the graph.
 - **9 languages** — 简体中文, 繁體中文, English, Español, العربية (RTL), Português, 日本語, Français, Deutsch.
 - **Themes** — light, dark, or follow system.

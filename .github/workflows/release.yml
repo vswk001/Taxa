@@ -105,6 +105,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Load release notes
+        # Multi-line env var via a heredoc delimiter.
+        run: |
+          echo "RELEASE_BODY<<TAXA_NOTES_EOF" >> "$GITHUB_ENV"
+          cat RELEASE_NOTES.md >> "$GITHUB_ENV"
+          echo "TAXA_NOTES_EOF" >> "$GITHUB_ENV"
+
       - name: Build and publish
         uses: tauri-apps/tauri-action@fce9c6108b31ea247710505d3aaaa893ee6768d4  # tauri-apps/tauri-action@v0
         env:
@@ -118,9 +125,7 @@ jobs:
         with:
           tagName: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
           releaseName: "Taxa ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-          releaseBody: |
-            Cross-platform builds for Windows, macOS, and Linux.
-            Download the asset matching your platform from the list below.
+          releaseBody: "${{ env.RELEASE_BODY }}"
           # Non-draft: the updater endpoint is releases/latest, which never
           # resolves to a draft — publishing a draft manually would leave
           # in-app updates 404ing until then.
