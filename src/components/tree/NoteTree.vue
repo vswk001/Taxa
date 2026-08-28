@@ -43,6 +43,7 @@
 
     <div
       v-if="contextMenu.show"
+      ref="contextMenuRef"
       class="context-menu"
       :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
       @click.stop
@@ -370,9 +371,15 @@ function handleGlobalClick() {
 }
 
 // Close the fixed-position context menu on any click outside the tree or on
-// Escape (previously only clicks inside the tree closed it).
-function onDocPointerDown() {
-  if (contextMenu.value.show) contextMenu.value.show = false;
+// Escape (previously only clicks inside the tree closed it). Clicks INSIDE
+// the menu must pass through — unmounting the menu on pointerdown would
+// destroy the button before its click event fires, killing every action.
+const contextMenuRef = ref<HTMLElement | null>(null);
+
+function onDocPointerDown(e: PointerEvent) {
+  if (!contextMenu.value.show) return;
+  if (contextMenuRef.value?.contains(e.target as Node)) return;
+  contextMenu.value.show = false;
 }
 
 function onDocKeyDown(e: KeyboardEvent) {
