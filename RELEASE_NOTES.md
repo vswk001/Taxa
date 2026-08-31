@@ -1,4 +1,4 @@
-# Taxa v0.4.1
+# Taxa v0.4.2
 
 **[简体中文](#简体中文) | [English](#english)**
 
@@ -6,31 +6,61 @@
 
 ## 简体中文
 
-v0.4.0 的补丁版本，修复一个影响较大的界面问题。
+功能更新版本：五项体验增强。
 
-### 🐛 修复
+### ✨ 新特性
 
-- **笔记树右键菜单所有功能失效**：点击菜单项（重命名、移动、删除、导入、导出等）没有任何反应。根因是"点击菜单外部自动关闭"的监听器在捕获阶段先行把菜单从界面移除，导致后续的点击事件无目标可达。现在点击菜单内部会正常执行操作，点击外部和 Esc 关闭行为不变。
+#### 1. 划词 AI 操作
+在笔记中**选中一段文字**，选区下方会浮出操作菜单：**润色 / 翻译 / 解释 / 扩写**。AI 结果预览后可一键**替换原选区**或**插入到其后**。翻译方向自动判断（中文↔其他语言）。
 
-### 🔄 升级建议
+#### 2. 图谱视图可导航
+- **点击节点**直接打开对应笔记（与拖拽自动区分）
+- **滚轮缩放**（以光标为中心，20%–300%），工具栏提供放大/缩小/重置
+- **拖拽空白区域平移画布**，缩放较小时标签自动淡出
 
-- **从 v0.3.x 或更早版本升级**：直接下载下方安装包覆盖安装。
-- **已安装 v0.4.0**：在应用内 设置 → 关于 → 检查更新，可直接升级到本版本。
+#### 3. 页签会话持久化 + 未保存标记
+- 重启应用自动恢复上次的页签（含固定状态）和活动页签；笔记已删除的页签自动清理
+- 有未保存修改时，活动页签显示**圆点标记**
+
+#### 4. 每日笔记
+目录树新增 📅 按钮：一键打开今天的笔记，首次点击自动在 `Daily` 文件夹创建；同一天反复进入同一篇，内容自然累积。
+
+#### 5. 文件夹导出携带附件
+导出文件夹时自动打包笔记中引用的图片（`attachments/`），导出目录自包含，换机器图片不丢失。
+
+### 🔄 升级
+
+- 应用内 设置 → 关于 → 检查更新，可直接升级到本版本。
 
 ---
 
 ## English
 
-A patch release for v0.4.0 fixing a significant UI regression.
+A feature release with five experience upgrades.
 
-### 🐛 Fixed
+### ✨ Features
 
-- **All note-tree context menu actions were dead**: clicking menu items (rename, move, delete, import, export, etc.) did nothing. Root cause: the "close the menu when clicking outside" listener ran in the capture phase and removed the menu from the DOM before the item's click event could reach it. Clicks inside the menu now execute normally; clicking outside and pressing Escape still close it.
+#### 1. Selection AI
+**Select text** in a note to reveal a floating menu: **Polish / Translate / Explain / Expand**. Preview the result, then **replace** the selection or **insert after** it. Translation direction is detected automatically (Chinese ↔ other languages).
+
+#### 2. Navigable graph view
+- **Click a node** to open its note (distinguished from dragging automatically)
+- **Wheel zoom** centered on the cursor (20%–300%) plus toolbar zoom in/out/reset
+- **Drag empty space to pan**; labels fade out at low zoom levels
+
+#### 3. Tab session persistence + unsaved indicator
+- Tabs (with pin state) and the active tab are **restored on restart**; tabs whose notes no longer exist are dropped
+- The active tab shows a **dot** while it has unsaved changes
+
+#### 4. Daily notes
+A 📅 button in the tree header opens today's note, creating it in the `Daily` folder on first use; same-day visits accumulate into the same note.
+
+#### 5. Folder export includes attachments
+Exporting a folder now packages the images its notes reference (`attachments/`), so the exported folder is self-contained.
 
 ### 🔄 Upgrading
 
-- **From v0.3.x or earlier**: download an installer below and install over your existing setup.
-- **On v0.4.0**: open Settings → About → Check for Updates to upgrade in-app.
+- Open Settings → About → Check for Updates to upgrade in-app.
 
 ---
 
@@ -38,7 +68,7 @@ A patch release for v0.4.0 fixing a significant UI regression.
 
 | 平台 / Platform | 资产 / Asset |
 |---|---|
-| Windows | `Taxa_0.4.1_x64-setup.exe` / `.msi` |
-| macOS (Apple Silicon + Intel) | `Taxa_0.4.1_universal.dmg` |
+| Windows | `Taxa_0.4.2_x64-setup.exe` / `.msi` |
+| macOS (Apple Silicon + Intel) | `Taxa_0.4.2_universal.dmg` |
 | Linux | `.AppImage` / `.deb` / `.rpm` |
 | MCP 服务器 / MCP server | `taxa-mcp-*` |
