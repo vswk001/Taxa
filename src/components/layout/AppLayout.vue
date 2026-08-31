@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
@@ -78,6 +78,54 @@ function openGraphTab() {
   editorStore.openTab('__graph__', t('graph.title'));
 }
 
+// ---- tab session persistence ------------------------------------------------
+// Open tabs (with pin state) and the active tab survive restarts. The note
+// behind a restored tab is fetched by NoteEditor's activeTabId watcher; a
+// tab whose note is gone is closed there.
+const TABS_STORAGE_KEY = 'taxa-open-tabs';
+
+function restoreTabSession() {
+  try {
+    const raw = localStorage.getItem(TABS_STORAGE_KEY);
+    if (!raw) return;
+    const session = JSON.parse(raw) as {
+      tabs: { id: string; title: string; pinned?: boolean }[];
+      activeTabId: string | null;
+    };
+    if (Array.isArray(session.tabs) && session.tabs.length) {
+      editorStore.openTabs = session.tabs.map((tb) => ({
+        id: tb.id,
+        title: tb.title,
+        pinned: !!tb.pinned,
+      }));
+      editorStore.activeTabId =
+        session.activeTabId && session.tabs.some((tb) => tb.id === session.activeTabId)
+          ? session.activeTabId
+          : session.tabs[session.tabs.length - 1].id;
+    }
+  } catch {
+    /* corrupt session — start fresh */
+  }
+}
+
+let saveTabsTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => [
+    editorStore.openTabs.map((tb) => ({ id: tb.id, title: tb.title, pinned: tb.pinned })),
+    editorStore.activeTabId,
+  ] as const,
+  () => {
+    if (saveTabsTimer) clearTimeout(saveTabsTimer);
+    saveTabsTimer = setTimeout(() => {
+      localStorage.setItem(
+        TABS_STORAGE_KEY,
+        JSON.stringify({ tabs: editorStore.openTabs, activeTabId: editorStore.activeTabId }),
+      );
+    }, 500);
+  },
+  { deep: true },
+);
+
 function handleKeyboard(e: KeyboardEvent) {
   // Skip when typing in the editor/inputs so editor shortcuts (Ctrl+B for
   // bold, etc.) don't also toggle panels.
@@ -93,6 +141,7 @@ function handleKeyboard(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyboard);
+  restoreTabSession();
   // Register the global quick-capture hotkey (main window only). A visible
   // error matters here: a stale second dev instance holding the shortcut
   // otherwise looks like "the hotkey is dead".

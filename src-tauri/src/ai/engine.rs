@@ -91,6 +91,19 @@ impl AiEngine {
         .await
     }
 
+    pub async fn text_action(
+        providers: &[ProviderConfig],
+        text: &str,
+        action: &str,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<String> {
+        Self::try_providers(providers, &None, cancel, |config, _cb, cancel| {
+            AiOrganizer::text_action(config, text, action, cancel, locale)
+        })
+        .await
+    }
+
     fn notify_fallback(
         on_event: &Option<StreamCallback>,
         failed: &ProviderConfig,

@@ -45,6 +45,7 @@ export default {
     createNoteFailed: '建立筆記失敗',
     createFolderFailed: '建立資料夾失敗',
     operationFailed: '操作失敗',
+    dailyNote: '每日筆記',
   },
   editor: {
     titlePlaceholder: '筆記標題...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: '關閉其他分頁',
     closeRight: '關閉右側分頁',
     closeAll: '關閉全部分頁',
+    aiAction: {
+      polish: '潤飾',
+      translate: '翻譯',
+      explain: '解釋',
+      expand: '擴寫',
+      working: '處理中…',
+      replace: '取代',
+      insertAfter: '插入到後面',
+    },
+    unsavedChanges: '有未儲存的修改',
   },
   search: {
     placeholder: '搜尋筆記...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: '筆記圖譜',
+    zoomIn: '放大',
+    zoomOut: '縮小',
+    resetView: '重設檢視',
   },
   trash: {
     title: '回收桶',

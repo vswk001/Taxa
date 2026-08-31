@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'Error al crear nota',
     createFolderFailed: 'Error al crear carpeta',
     operationFailed: 'Operación fallida',
+    dailyNote: 'Nota diaria',
   },
   editor: {
     titlePlaceholder: 'Título de la nota...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'Cerrar las demás pestañas',
     closeRight: 'Cerrar pestañas a la derecha',
     closeAll: 'Cerrar todas las pestañas',
+    aiAction: {
+      polish: 'Pulir',
+      translate: 'Traducir',
+      explain: 'Explicar',
+      expand: 'Ampliar',
+      working: 'Procesando…',
+      replace: 'Reemplazar',
+      insertAfter: 'Insertar después',
+    },
+    unsavedChanges: 'Cambios sin guardar',
   },
   search: {
     placeholder: 'Buscar notas...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'Grafo de Notas',
+    zoomIn: 'Acercar',
+    zoomOut: 'Alejar',
+    resetView: 'Restablecer vista',
   },
   trash: {
     title: 'Papelera',

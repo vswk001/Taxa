@@ -1,6 +1,17 @@
 <template>
-  <div ref="containerRef" class="milkdown-container" @paste="onPaste" @drop.prevent="onDrop">
+  <div ref="containerRef" class="milkdown-container" @paste="onPaste" @drop.prevent="onDrop" @mouseup="updateSelectionPanel" @keyup="updateSelectionPanel">
     <Milkdown />
+    <SelectionAiPanel
+      :visible="selectionAi.visible"
+      :x="selectionAi.x"
+      :y="selectionAi.y"
+      :state="selectionAi.state"
+      :result="selectionAi.result"
+      :error="selectionAi.error"
+      @action="runSelectionAction"
+      @apply="applySelectionResult"
+      @cancel="hideSelectionPanel"
+    />
   </div>
 </template>
 
@@ -14,12 +25,101 @@ import '@milkdown/crepe/theme/common/style.css';
 import { EditorState } from 'prosemirror-state';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import SelectionAiPanel from './SelectionAiPanel.vue';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = defineProps<{ modelValue: string; noteId?: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 const containerRef = ref<HTMLElement | null>(null);
+
+// ---- selection AI ---------------------------------------------------------
+// A non-empty selection in an open note shows a floating action menu; the
+// recorded ProseMirror range lets the result replace/extend exactly the
+// selected text even after the panel steals focus.
+const selectionAi = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  state: 'idle' as 'idle' | 'loading' | 'done' | 'error',
+  result: '',
+  error: '',
+});
+let selectionRange: { from: number; to: number; text: string } | null = null;
+
+function updateSelectionPanel() {
+  const editor = getInstance();
+  if (!editor || loading.value || !props.noteId) {
+    selectionAi.value.visible = false;
+    selectionRange = null;
+    return;
+  }
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const { from, to } = view.state.selection;
+    const text = view.state.doc.textBetween(from, to, '\n');
+    if (to <= from || !text.trim() || text.length > 6000) {
+      selectionAi.value.visible = false;
+      selectionRange = null;
+      return;
+    }
+    selectionRange = { from, to, text };
+    try {
+      const coords = view.coordsAtPos(to);
+      selectionAi.value = {
+        visible: true,
+        x: coords.left,
+        y: coords.bottom + 8,
+        state: 'idle',
+        result: '',
+        error: '',
+      };
+    } catch {
+      selectionAi.value.visible = false;
+    }
+  });
+}
+
+async function runSelectionAction(action: string) {
+  if (!selectionRange) return;
+  selectionAi.value.state = 'loading';
+  try {
+    const result = await invoke<string>('ai_text_action', {
+      text: selectionRange.text,
+      action,
+      locale: locale.value,
+    });
+    selectionAi.value.result = result || '';
+    selectionAi.value.state = 'done';
+  } catch (e) {
+    selectionAi.value.error = e instanceof Error ? e.message : String(e);
+    selectionAi.value.state = 'error';
+  }
+}
+
+function applySelectionResult(mode: 'replace' | 'insert') {
+  const range = selectionRange;
+  if (!range) return;
+  const editor = getInstance();
+  if (editor && !loading.value) {
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const text = selectionAi.value.result;
+      const tr = mode === 'replace'
+        ? view.state.tr.insertText(text, range.from, range.to)
+        : view.state.tr.insertText(text, range.to);
+      view.dispatch(tr.scrollIntoView());
+      view.focus();
+    });
+  }
+  selectionAi.value.visible = false;
+  selectionRange = null;
+}
+
+function hideSelectionPanel() {
+  selectionAi.value.visible = false;
+  selectionRange = null;
+}
 
 // Programmatic-set echo suppression: instead of a time-based flag (which
 // swallowed keystrokes within its window), the first markdownUpdated after a

@@ -9,6 +9,9 @@
         <button @click="handleNewFolder" :title="t('tree.newFolder')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         </button>
+        <button @click="openDailyNote" :title="t('tree.dailyNote')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
         <button @click="trashVisible = true" :title="t('trash.title')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
         </button>
@@ -240,6 +243,34 @@ async function handleNewNote() {
   } catch (e: any) {
     console.error('Failed to create note:', e);
     await tauriMessage(e.message || String(e), { title: t('tree.createNoteFailed'), kind: 'error' });
+  }
+}
+
+/** Open today's note, creating it on first use. Same-day reopens land on
+ *  the same note (title = ISO date), so captures and edits accumulate. */
+async function openDailyNote() {
+  const today = new Date().toISOString().slice(0, 10);
+  const existing = notebookStore.notes.find(
+    (n) => n.folder === 'Daily' && n.title === today,
+  );
+  if (existing) {
+    await notebookStore.openNote(existing.id);
+    const note = notebookStore.currentNote;
+    if (note) editorStore.openTab(note.note.id, note.note.title);
+    return;
+  }
+  try {
+    const note = await notebookStore.createNote(
+      'Daily',
+      today,
+      `# ${today}
+
+`,
+    );
+    editorStore.openTab(note.id, note.title);
+    await refreshAll();
+  } catch (e) {
+    console.error('failed to create daily note:', e);
   }
 }
 

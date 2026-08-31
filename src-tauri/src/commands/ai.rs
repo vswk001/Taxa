@@ -235,6 +235,30 @@ async fn ai_ask_notes_inner(
     Ok(AskResult { answer, sources })
 }
 
+/// Inline action on selected editor text (polish/translate/explain/expand).
+#[tauri::command]
+pub async fn ai_text_action(
+    state: State<'_, Arc<AppState>>,
+    text: String,
+    action: String,
+    locale: String,
+) -> AppResult<String> {
+    let cancel = state.register_cancel(u32::MAX - 1);
+    let result = {
+        let providers = state.ai_engine.read().await.get_providers_in_order();
+        crate::ai::engine::AiEngine::text_action(
+            &providers,
+            &text,
+            &action,
+            cancel.clone(),
+            &locale,
+        )
+        .await
+    };
+    state.unregister_cancel(u32::MAX - 1);
+    result
+}
+
 /// Abort an in-flight AI request (user pressed stop / the UI timed out).
 #[tauri::command]
 pub async fn ai_cancel(state: State<'_, Arc<AppState>>, seq: u32) -> AppResult<()> {

@@ -96,6 +96,7 @@ pub fn run() {
             commands::ai::ai_test_provider,
             commands::ai::ai_cancel,
             commands::ai::ai_ask_notes,
+            commands::ai::ai_text_action,
             commands::settings::list_providers,
             commands::settings::save_provider,
             commands::settings::delete_provider,

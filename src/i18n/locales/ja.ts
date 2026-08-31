@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'ノートの作成に失敗しました',
     createFolderFailed: 'フォルダの作成に失敗しました',
     operationFailed: '操作に失敗しました',
+    dailyNote: 'デイリーノート',
   },
   editor: {
     titlePlaceholder: 'ノートタイトル...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: '他のタブを閉じる',
     closeRight: '右側のタブを閉じる',
     closeAll: 'すべてのタブを閉じる',
+    aiAction: {
+      polish: '推敲',
+      translate: '翻訳',
+      explain: '説明',
+      expand: '拡張',
+      working: '処理中…',
+      replace: '置換',
+      insertAfter: '後ろに挿入',
+    },
+    unsavedChanges: '未保存の変更があります',
   },
   search: {
     placeholder: 'ノートを検索...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'ノートグラフ',
+    zoomIn: '拡大',
+    zoomOut: '縮小',
+    resetView: '表示をリセット',
   },
   trash: {
     title: 'ゴミ箱',

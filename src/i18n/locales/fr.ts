@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'Échec de la création de la note',
     createFolderFailed: 'Échec de la création du dossier',
     operationFailed: 'L\'opération a échoué',
+    dailyNote: 'Note du jour',
   },
   editor: {
     titlePlaceholder: 'Titre de la note...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'Fermer les autres onglets',
     closeRight: 'Fermer les onglets à droite',
     closeAll: 'Fermer tous les onglets',
+    aiAction: {
+      polish: 'Polir',
+      translate: 'Traduire',
+      explain: 'Expliquer',
+      expand: 'Développer',
+      working: 'Traitement…',
+      replace: 'Remplacer',
+      insertAfter: 'Insérer après',
+    },
+    unsavedChanges: 'Modifications non enregistrées',
   },
   search: {
     placeholder: 'Rechercher des notes...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'Graphe de Notes',
+    zoomIn: 'Zoom avant',
+    zoomOut: 'Zoom arrière',
+    resetView: 'Réinitialiser la vue',
   },
   trash: {
     title: 'Corbeille',

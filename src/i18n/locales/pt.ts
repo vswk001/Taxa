@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'Falha ao criar nota',
     createFolderFailed: 'Falha ao criar pasta',
     operationFailed: 'Operação falhou',
+    dailyNote: 'Nota diária',
   },
   editor: {
     titlePlaceholder: 'Título da nota...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'Fechar as outras abas',
     closeRight: 'Fechar abas à direita',
     closeAll: 'Fechar todas as abas',
+    aiAction: {
+      polish: 'Polir',
+      translate: 'Traduzir',
+      explain: 'Explicar',
+      expand: 'Expandir',
+      working: 'Processando…',
+      replace: 'Substituir',
+      insertAfter: 'Inserir depois',
+    },
+    unsavedChanges: 'Alterações não salvas',
   },
   search: {
     placeholder: 'Pesquisar notas...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'Grafo de Notas',
+    zoomIn: 'Aproximar',
+    zoomOut: 'Afastar',
+    resetView: 'Redefinir exibição',
   },
   trash: {
     title: 'Lixeira',

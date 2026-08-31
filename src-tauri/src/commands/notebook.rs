@@ -363,10 +363,35 @@ pub async fn export_folder(
         let db = lock_db(&state)?;
         let md = MarkdownStorage::new(state.notes_dir());
         let notes = NotebookService::list_notes(&db, &md, &folder)?;
+
+        // Collect referenced attachments while writing the notes so the
+        // exported folder is self-contained (markdown references stay valid
+        // on the target machine).
+        let mut referenced: Vec<String> = Vec::new();
+        let re =
+            regex::Regex::new(r#"attachments/([^\s\)\]"']+)"#).expect("invalid attachment regex");
         for note in &notes {
             if let Ok(content) = md.read_note(&note.path) {
+                for cap in re.captures_iter(&content) {
+                    if let Some(name) = cap.get(1) {
+                        let name = name.as_str().to_string();
+                        if !referenced.contains(&name) {
+                            referenced.push(name);
+                        }
+                    }
+                }
                 let file_name = format!("{}.md", sanitize_filename(&note.title));
                 std::fs::write(export_dir.join(&file_name), &content)?;
+            }
+        }
+
+        let attachments_src = state.attachments_dir();
+        let attachments_dst = export_dir.join("attachments");
+        for name in &referenced {
+            let src = attachments_src.join(name);
+            if src.exists() {
+                std::fs::create_dir_all(&attachments_dst)?;
+                let _ = std::fs::copy(&src, attachments_dst.join(name));
             }
         }
         Ok(true)

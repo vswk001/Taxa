@@ -153,8 +153,14 @@ watch(() => notebookStore.currentNote, (newNote) => {
 watch(() => editorStore.activeTabId, async (newTabId) => {
   // '__graph__' is a pseudo-tab, not a note id — never feed it to openNote.
   if (newTabId && newTabId !== '__graph__' && notebookStore.currentNote?.note.id !== newTabId) {
-    await flushSave();
-    await notebookStore.openNote(newTabId);
+    try {
+      await flushSave();
+      await notebookStore.openNote(newTabId);
+    } catch (e) {
+      // A restored session tab whose note no longer exists: drop it.
+      console.warn('failed to open tab, closing it:', e);
+      editorStore.closeTab(newTabId);
+    }
   }
 });
 

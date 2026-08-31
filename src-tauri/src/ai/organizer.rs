@@ -187,6 +187,30 @@ impl AiOrganizer {
         Ok(response.content)
     }
 
+    /// Inline action on selected editor text; returns the transformed text.
+    pub async fn text_action(
+        config: ProviderConfig,
+        text: &str,
+        action: &str,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<String> {
+        let provider = create_provider(&config)?;
+        let messages = PromptTemplates::text_action(text, action, locale);
+        // Small, fast operations — plain chat keeps the flow simple.
+        let response = provider
+            .chat(
+                messages,
+                ChatOptions {
+                    max_tokens: 2048,
+                    ..ChatOptions::default()
+                },
+            )
+            .await?;
+        crate::ai::provider::err_if_cancelled(&cancel)?;
+        Ok(response.content.trim().to_string())
+    }
+
     pub fn apply_create(
         db: &Database,
         md: &MarkdownStorage,

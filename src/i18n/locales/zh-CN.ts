@@ -45,6 +45,7 @@ export default {
     createNoteFailed: '创建笔记失败',
     createFolderFailed: '创建文件夹失败',
     operationFailed: '操作失败',
+    dailyNote: '每日笔记',
   },
   editor: {
     titlePlaceholder: '笔记标题...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: '关闭其他标签页',
     closeRight: '关闭右侧标签页',
     closeAll: '关闭全部标签页',
+    aiAction: {
+      polish: '润色',
+      translate: '翻译',
+      explain: '解释',
+      expand: '扩写',
+      working: '处理中…',
+      replace: '替换',
+      insertAfter: '插入到后面',
+    },
+    unsavedChanges: '有未保存的修改',
   },
   search: {
     placeholder: '搜索笔记...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: '笔记图谱',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    resetView: '重置视图',
   },
   trash: {
     title: '回收站',

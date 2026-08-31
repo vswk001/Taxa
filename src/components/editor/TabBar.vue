@@ -10,6 +10,11 @@
       @contextmenu.prevent="openMenu($event, tab.id)"
     >
       <span v-if="tab.pinned" class="pin-icon" :title="t('editor.unpinTab')">📌</span>
+      <span
+        v-if="editorStore.isModified && tab.id === editorStore.activeTabId"
+        class="modified-dot"
+        :title="t('editor.unsavedChanges')"
+      ></span>
       <span class="tab-title">{{ tab.title }}</span>
       <button
         v-if="!tab.pinned"
@@ -190,6 +195,14 @@ async function handleCloseTab(tabId: string) {
 
 .tab.pinned {
   max-width: 180px;
+}
+
+.modified-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  flex-shrink: 0;
 }
 
 .pin-icon {

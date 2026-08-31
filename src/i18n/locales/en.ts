@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'Failed to create note',
     createFolderFailed: 'Failed to create folder',
     operationFailed: 'Operation failed',
+    dailyNote: 'Daily Note',
   },
   editor: {
     titlePlaceholder: 'Note title...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'Close Others',
     closeRight: 'Close to the Right',
     closeAll: 'Close All',
+    aiAction: {
+      polish: 'Polish',
+      translate: 'Translate',
+      explain: 'Explain',
+      expand: 'Expand',
+      working: 'Working...',
+      replace: 'Replace',
+      insertAfter: 'Insert After',
+    },
+    unsavedChanges: 'Unsaved changes',
   },
   search: {
     placeholder: 'Search notes...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'Note Graph',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    resetView: 'Reset View',
   },
   trash: {
     title: 'Trash',

@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'فشل إنشاء الملاحظة',
     createFolderFailed: 'فشل إنشاء المجلد',
     operationFailed: 'فشلت العملية',
+    dailyNote: 'ملاحظة اليوم',
   },
   editor: {
     titlePlaceholder: 'عنوان الملاحظة...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'إغلاق علامات التبويب الأخرى',
     closeRight: 'إغلاق علامات التبويب على اليمين',
     closeAll: 'إغلاق كل علامات التبويب',
+    aiAction: {
+      polish: 'تحسين',
+      translate: 'ترجمة',
+      explain: 'شرح',
+      expand: 'توسيع',
+      working: 'جارٍ المعالجة…',
+      replace: 'استبدال',
+      insertAfter: 'إدراج بعد',
+    },
+    unsavedChanges: 'تغييرات غير محفوظة',
   },
   search: {
     placeholder: 'البحث في الملاحظات...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'رسم بياني للملاحظات',
+    zoomIn: 'تكبير',
+    zoomOut: 'تصغير',
+    resetView: 'إعادة تعيين العرض',
   },
   trash: {
     title: 'المحذوفات',

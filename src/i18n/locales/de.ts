@@ -45,6 +45,7 @@ export default {
     createNoteFailed: 'Notiz konnte nicht erstellt werden',
     createFolderFailed: 'Ordner konnte nicht erstellt werden',
     operationFailed: 'Vorgang fehlgeschlagen',
+    dailyNote: 'Tagesnotiz',
   },
   editor: {
     titlePlaceholder: 'Notiztitel...',
@@ -69,6 +70,16 @@ export default {
     closeOthers: 'Andere Tabs schließen',
     closeRight: 'Tabs rechts schließen',
     closeAll: 'Alle Tabs schließen',
+    aiAction: {
+      polish: 'Polieren',
+      translate: 'Übersetzen',
+      explain: 'Erklären',
+      expand: 'Erweitern',
+      working: 'Läuft…',
+      replace: 'Ersetzen',
+      insertAfter: 'Danach einfügen',
+    },
+    unsavedChanges: 'Ungespeicherte Änderungen',
   },
   search: {
     placeholder: 'Notizen suchen...',
@@ -209,6 +220,9 @@ export default {
   },
   graph: {
     title: 'Notizen-Graph',
+    zoomIn: 'Vergrößern',
+    zoomOut: 'Verkleinern',
+    resetView: 'Ansicht zurücksetzen',
   },
   trash: {
     title: 'Papierkorb',
