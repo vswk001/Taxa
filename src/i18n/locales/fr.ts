@@ -64,6 +64,11 @@ export default {
     linkedOut: 'Liens sortants',
     unresolvedLinks: 'Non résolus',
     createNote: 'Créer',
+    pinTab: 'Épingler l\'onglet',
+    unpinTab: 'Détacher l\'onglet',
+    closeOthers: 'Fermer les autres onglets',
+    closeRight: 'Fermer les onglets à droite',
+    closeAll: 'Fermer tous les onglets',
   },
   search: {
     placeholder: 'Rechercher des notes...',

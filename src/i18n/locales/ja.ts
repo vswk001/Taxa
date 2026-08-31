@@ -64,6 +64,11 @@ export default {
     linkedOut: 'このノートから',
     unresolvedLinks: '未解決',
     createNote: '作成',
+    pinTab: 'タブを固定',
+    unpinTab: '固定を解除',
+    closeOthers: '他のタブを閉じる',
+    closeRight: '右側のタブを閉じる',
+    closeAll: 'すべてのタブを閉じる',
   },
   search: {
     placeholder: 'ノートを検索...',

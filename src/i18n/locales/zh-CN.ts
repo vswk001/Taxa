@@ -64,6 +64,11 @@ export default {
     linkedOut: '指向',
     unresolvedLinks: '未解析',
     createNote: '新建',
+    pinTab: '固定标签页',
+    unpinTab: '取消固定',
+    closeOthers: '关闭其他标签页',
+    closeRight: '关闭右侧标签页',
+    closeAll: '关闭全部标签页',
   },
   search: {
     placeholder: '搜索笔记...',

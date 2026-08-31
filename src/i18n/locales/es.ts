@@ -64,6 +64,11 @@ export default {
     linkedOut: 'Enlaces salientes',
     unresolvedLinks: 'Sin resolver',
     createNote: 'Crear',
+    pinTab: 'Fijar pestaña',
+    unpinTab: 'Desfijar pestaña',
+    closeOthers: 'Cerrar las demás pestañas',
+    closeRight: 'Cerrar pestañas a la derecha',
+    closeAll: 'Cerrar todas las pestañas',
   },
   search: {
     placeholder: 'Buscar notas...',

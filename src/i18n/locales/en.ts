@@ -64,6 +64,11 @@ export default {
     linkedOut: 'Links to',
     unresolvedLinks: 'Unresolved',
     createNote: 'Create',
+    pinTab: 'Pin Tab',
+    unpinTab: 'Unpin Tab',
+    closeOthers: 'Close Others',
+    closeRight: 'Close to the Right',
+    closeAll: 'Close All',
   },
   search: {
     placeholder: 'Search notes...',

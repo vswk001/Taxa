@@ -64,6 +64,11 @@ export default {
     linkedOut: 'Links de saída',
     unresolvedLinks: 'Não resolvidos',
     createNote: 'Criar',
+    pinTab: 'Fixar aba',
+    unpinTab: 'Desafixar aba',
+    closeOthers: 'Fechar as outras abas',
+    closeRight: 'Fechar abas à direita',
+    closeAll: 'Fechar todas as abas',
   },
   search: {
     placeholder: 'Pesquisar notas...',

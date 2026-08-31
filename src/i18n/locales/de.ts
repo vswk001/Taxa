@@ -64,6 +64,11 @@ export default {
     linkedOut: 'Ausgehende Links',
     unresolvedLinks: 'Ungelöst',
     createNote: 'Erstellen',
+    pinTab: 'Tab anheften',
+    unpinTab: 'Tab lösen',
+    closeOthers: 'Andere Tabs schließen',
+    closeRight: 'Tabs rechts schließen',
+    closeAll: 'Alle Tabs schließen',
   },
   search: {
     placeholder: 'Notizen suchen...',

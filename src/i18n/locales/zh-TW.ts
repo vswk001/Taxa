@@ -64,6 +64,11 @@ export default {
     linkedOut: '指向',
     unresolvedLinks: '未解析',
     createNote: '新增',
+    pinTab: '固定分頁',
+    unpinTab: '取消固定',
+    closeOthers: '關閉其他分頁',
+    closeRight: '關閉右側分頁',
+    closeAll: '關閉全部分頁',
   },
   search: {
     placeholder: '搜尋筆記...',

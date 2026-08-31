@@ -64,6 +64,11 @@ export default {
     linkedOut: 'روابط صادرة',
     unresolvedLinks: 'غير محلولة',
     createNote: 'إنشاء',
+    pinTab: 'تثبيت علامة التبويب',
+    unpinTab: 'إلغاء التثبيت',
+    closeOthers: 'إغلاق علامات التبويب الأخرى',
+    closeRight: 'إغلاق علامات التبويب على اليمين',
+    closeAll: 'إغلاق كل علامات التبويب',
   },
   search: {
     placeholder: 'البحث في الملاحظات...',
