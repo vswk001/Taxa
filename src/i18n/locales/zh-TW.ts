@@ -22,8 +22,8 @@ export default {
     noFolders: '暫無資料夾',
     createFirst: '建立第一個資料夾',
     importFile: '匯入檔案...',
-    importFolder: '匯入目錄...',
-    exportFolder: '匯出目錄...',
+    importFolder: '匯入資料夾...',
+    exportFolder: '匯出資料夾...',
     exportNote: '匯出為檔案...',
     deleteFolder: '刪除',
     deleteFolderConfirm: '確定要刪除資料夾「{name}」及其所有內容嗎？',
@@ -204,7 +204,7 @@ export default {
   },
   folder: {
     noteCount: '{count} 篇筆記',
-    emptyFolder: '此目錄下暫無筆記',
+    emptyFolder: '此資料夾下暫無筆記',
     noSummary: '暫無摘要',
   },
   graph: {

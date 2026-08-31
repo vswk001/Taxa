@@ -300,14 +300,14 @@ pub struct ImportFolderResult {
 
 #[tauri::command]
 pub async fn import_folder(app: AppHandle) -> AppResult<Option<ImportFolderResult>> {
-    let dir = match pick_folder(&app, "打开目录").await? {
+    let dir = match pick_folder(&app, "选择文件夹").await? {
         Some(p) => file_path_to_pathbuf(&p)?,
         None => return Ok(None),
     };
     let folder_name = dir
         .file_name()
         .and_then(|s| s.to_str())
-        .unwrap_or("导入目录")
+        .unwrap_or("导入文件夹")
         .to_string();
 
     let notes = tokio::task::spawn_blocking(move || {
@@ -351,7 +351,7 @@ pub async fn export_folder(
     app: AppHandle,
     folder: String,
 ) -> AppResult<bool> {
-    let export_dir_root = match pick_folder(&app, "导出目录").await? {
+    let export_dir_root = match pick_folder(&app, "选择导出文件夹").await? {
         Some(p) => file_path_to_pathbuf(&p)?,
         None => return Ok(false),
     };

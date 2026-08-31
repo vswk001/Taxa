@@ -22,8 +22,8 @@ export default {
     noFolders: '暂无文件夹',
     createFirst: '创建第一个文件夹',
     importFile: '导入文件...',
-    importFolder: '导入目录...',
-    exportFolder: '导出目录...',
+    importFolder: '导入文件夹...',
+    exportFolder: '导出文件夹...',
     exportNote: '导出为文件...',
     deleteFolder: '删除',
     deleteFolderConfirm: '确定要删除文件夹 "{name}" 及其所有内容吗?',
@@ -204,7 +204,7 @@ export default {
   },
   folder: {
     noteCount: '{count} 篇笔记',
-    emptyFolder: '此目录下暂无笔记',
+    emptyFolder: '此文件夹下暂无笔记',
     noSummary: '暂无摘要',
   },
   graph: {
