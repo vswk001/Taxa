@@ -191,6 +191,9 @@ export default {
     backupFailed: "Échec de la sauvegarde",
     restoreBackup: 'Restaurer une sauvegarde...',
     restoreConfirm: 'La restauration remplace TOUTES les notes et paramètres actuels par la sauvegarde, puis redémarre. Continuer ?',
+    viewReleaseNotes: "Nouveautés",
+    releaseNotes: 'Notes de version',
+    releaseNotesEmpty: "Aucune note de version pour cette version.",
   },
   llmForm: {
     name: 'Nom',

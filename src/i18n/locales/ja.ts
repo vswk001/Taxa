@@ -191,6 +191,9 @@ export default {
     backupFailed: 'バックアップに失敗しました',
     restoreBackup: 'バックアップから復元...',
     restoreConfirm: '復元すると現在のノートと設定がすべてバックアップの内容で置き換えられ、再起動します。続行しますか？',
+    viewReleaseNotes: '更新内容を見る',
+    releaseNotes: 'リリースノート',
+    releaseNotesEmpty: 'このバージョンのリリースノートはありません。',
   },
   llmForm: {
     name: '名前',

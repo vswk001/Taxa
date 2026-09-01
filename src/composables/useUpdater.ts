@@ -16,18 +16,34 @@ export function useUpdater() {
   const newVersion = ref('');
   const errorMsg = ref('');
   const progress = ref(0);
+  /** Release notes of the pending update (from latest.json's notes field). */
+  const updateNotes = ref('');
   let pending: Update | null = null;
 
   async function checkForUpdates() {
     state.value = 'checking';
     errorMsg.value = '';
     progress.value = 0;
+    updateNotes.value = '';
     try {
       const update = await check();
       pending = update;
       if (update) {
         state.value = 'available';
         newVersion.value = update.version;
+        updateNotes.value = update.body ?? '';
+        if (!updateNotes.value) {
+          // Some endpoints omit notes; fall back to the GitHub release body.
+          try {
+            const resp = await fetch('https://api.github.com/repos/vswk001/Taxa/releases/latest');
+            if (resp.ok) {
+              const release = (await resp.json()) as { body?: string };
+              updateNotes.value = release.body ?? '';
+            }
+          } catch {
+            /* notes are optional — the version banner still works */
+          }
+        }
       } else {
         state.value = 'uptodate';
       }
@@ -67,5 +83,5 @@ export function useUpdater() {
     }
   }
 
-  return { state, newVersion, errorMsg, progress, checkForUpdates, downloadAndInstall };
+  return { state, newVersion, errorMsg, progress, updateNotes, checkForUpdates, downloadAndInstall };
 }

@@ -191,6 +191,9 @@ export default {
     backupFailed: 'فشل النسخ الاحتياطي',
     restoreBackup: 'استعادة من نسخة...',
     restoreConfirm: 'الاستعادة تستبدل كل الملاحظات والإعدادات الحالية بمحتوى النسخة ثم تعيد التشغيل. هل تريد المتابعة؟',
+    viewReleaseNotes: 'ما الجديد',
+    releaseNotes: 'ملاحظات الإصدار',
+    releaseNotesEmpty: 'لا توجد ملاحظات إصدار لهذه النسخة.',
   },
   llmForm: {
     name: 'الاسم',

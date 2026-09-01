@@ -141,6 +141,7 @@
                   <template v-else-if="updater.state.value === 'available'">
                     {{ t('settings.updateAvailable', { version: updater.newVersion.value }) }}
                     <button class="install-btn" :disabled="false" @click="updater.downloadAndInstall">{{ t('settings.updateInstall') }}</button>
+                    <button class="view-notes-btn" @click="notesVisible = true">{{ t('settings.viewReleaseNotes') }}</button>
                   </template>
                   <template v-else-if="updater.state.value === 'downloading'">{{ t('settings.updateDownloading', { p: updater.progress.value }) }}</template>
                   <template v-else-if="updater.state.value === 'installing'">{{ t('settings.updateInstalling') }}</template>
@@ -152,6 +153,13 @@
         </div>
       </div>
     </div>
+    <ReleaseNotesDialog
+      :visible="notesVisible"
+      :version="updater.newVersion.value"
+      :markdown="updater.updateNotes.value"
+      @close="notesVisible = false"
+      @install="notesVisible = false; updater.downloadAndInstall"
+    />
     <ConfirmDialog
       :visible="confirmVisible"
       :message="confirmMsg"
@@ -182,6 +190,7 @@ import type { LlmProvider } from '@/types/settings';
 import { useProviderDrag } from '@/composables/useProviderDrag';
 import { useUpdater } from '@/composables/useUpdater';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
+import ReleaseNotesDialog from './ReleaseNotesDialog.vue';
 import LlmProviderForm from './LlmProviderForm.vue';
 
 const props = defineProps<{ visible: boolean }>();
@@ -209,6 +218,7 @@ const activeTab = ref('general');
 const quickCapture = ref(loadQuickCaptureSettings());
 const closeToTray = ref((localStorage.getItem('taxa-close-to-tray') ?? 'true') === 'true');
 const busyAction = ref<'' | 'backup' | 'restore'>('');
+const notesVisible = ref(false);
 const defaultAccelerator = DEFAULT_ACCELERATOR;
 const showForm = ref(false);
 const editingProvider = ref<LlmProvider | null>(null);
@@ -508,6 +518,21 @@ async function setDefault(id: string) {
 .about-version { font-size: 13px; color: var(--text-secondary); margin-top: 16px; }
 .about-tech { font-size: 12px; color: var(--text-secondary); opacity: 0.7; margin-top: 4px; }
 .updater { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.view-notes-btn {
+  padding: 3px 12px;
+  font-size: 12px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.view-notes-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
 .check-update-btn { padding: 7px 18px; font-size: 13px; background: var(--accent-color); color: white; border: none; border-radius: 6px; cursor: pointer; }
 .check-update-btn:hover:not(:disabled) { opacity: 0.9; }
 .check-update-btn:disabled { opacity: 0.5; cursor: default; }

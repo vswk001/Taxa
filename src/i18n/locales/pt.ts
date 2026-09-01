@@ -191,6 +191,9 @@ export default {
     backupFailed: 'Falha no backup',
     restoreBackup: 'Restaurar backup...',
     restoreConfirm: 'Restaurar substituirá TODAS as notas e configurações atuais pelo backup e reiniciará. Continuar?',
+    viewReleaseNotes: 'Novidades',
+    releaseNotes: 'Notas da versão',
+    releaseNotesEmpty: 'Sem notas de versão para esta versão.',
   },
   llmForm: {
     name: 'Nome',

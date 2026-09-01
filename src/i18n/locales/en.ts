@@ -191,6 +191,9 @@ export default {
     backupFailed: 'Backup failed',
     restoreBackup: 'Restore from Backup...',
     restoreConfirm: 'Restoring replaces ALL current notes and settings with the backup. Continue and restart?',
+    viewReleaseNotes: 'What\'s New',
+    releaseNotes: 'Release Notes',
+    releaseNotesEmpty: 'No release notes available for this version.',
   },
   llmForm: {
     name: 'Name',

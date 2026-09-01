@@ -191,6 +191,9 @@ export default {
     backupFailed: 'Backup fehlgeschlagen',
     restoreBackup: 'Aus Backup wiederherstellen...',
     restoreConfirm: 'Die Wiederherstellung ersetzt ALLE aktuellen Notizen und Einstellungen durch das Backup und startet neu. Fortfahren?',
+    viewReleaseNotes: 'Was ist neu',
+    releaseNotes: 'Versionshinweise',
+    releaseNotesEmpty: 'Keine Versionshinweise für diese Version verfügbar.',
   },
   llmForm: {
     name: 'Name',

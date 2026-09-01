@@ -191,6 +191,9 @@ export default {
     backupFailed: 'Error al copiar',
     restoreBackup: 'Restaurar copia...',
     restoreConfirm: 'Restaurar reemplazará TODAS las notas y ajustes actuales por la copia y reiniciará. ¿Continuar?',
+    viewReleaseNotes: 'Novedades',
+    releaseNotes: 'Notas de la versión',
+    releaseNotesEmpty: 'No hay notas de versión para esta versión.',
   },
   llmForm: {
     name: 'Nombre',

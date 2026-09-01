@@ -191,6 +191,9 @@ export default {
     backupFailed: '备份失败',
     restoreBackup: '从备份恢复...',
     restoreConfirm: '恢复将用备份内容替换当前全部笔记和设置，并重启应用。继续吗？',
+    viewReleaseNotes: '查看更新内容',
+    releaseNotes: '版本更新内容',
+    releaseNotesEmpty: '该版本暂无更新说明。',
   },
   llmForm: {
     name: '名称',

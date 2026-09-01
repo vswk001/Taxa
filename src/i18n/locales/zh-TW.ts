@@ -191,6 +191,9 @@ export default {
     backupFailed: '備份失敗',
     restoreBackup: '從備份還原...',
     restoreConfirm: '還原將以備份內容取代目前全部筆記與設定，並重新啟動。繼續嗎？',
+    viewReleaseNotes: '查看更新內容',
+    releaseNotes: '版本更新內容',
+    releaseNotesEmpty: '該版本暫無更新說明。',
   },
   llmForm: {
     name: '名稱',
