@@ -10,6 +10,7 @@
 
 Capture anything — Taxa auto-categorizes, enriches, and connects it. All data stays on your device.
 
+[![CI](https://github.com/vswk001/Taxa/actions/workflows/ci.yml/badge.svg)](https://github.com/vswk001/Taxa/actions/workflows/ci.yml)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue)](https://tauri.app)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-orange)](https://www.rust-lang.org)

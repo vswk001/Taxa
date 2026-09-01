@@ -1,3 +1,4 @@
+[![CI](https://github.com/vswk001/Taxa/actions/workflows/ci.yml/badge.svg)](https://github.com/vswk001/Taxa/actions/workflows/ci.yml)
 [English](README.md) | **简体中文**
 
 <div align="center">
