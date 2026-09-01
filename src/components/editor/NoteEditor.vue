@@ -41,6 +41,14 @@
             @keydown.escape="tagInputVisible = false"
             @blur="addTag"
           />
+          <div v-if="tagSuggestions.length" class="tag-suggestions">
+            <button
+              v-for="sug in tagSuggestions"
+              :key="sug"
+              type="button"
+              @mousedown.prevent="newTag = sug; addTag()"
+            >{{ sug }}</button>
+          </div>
         </div>
         <button v-else class="tag-add" @click="showTagInput">+</button>
         <span v-if="saveError" class="save-error">{{ saveError }}</span>
@@ -112,6 +120,19 @@ let isDirty = false;
 // document on every keystroke is wasteful for large notes.
 const contentForCount = ref('');
 let countTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Existing-tag autocomplete for the tag input (case-insensitive prefix).
+const tagSuggestions = computed(() => {
+  const query = newTag.value.trim().toLowerCase();
+  if (!query) return [];
+  const all = new Set<string>();
+  for (const note of notebookStore.notes) {
+    for (const tag of note.tags ?? []) all.add(tag);
+  }
+  return [...all]
+    .filter((tag) => tag.toLowerCase().includes(query) && tag.toLowerCase() !== query)
+    .slice(0, 6);
+});
 
 const wordCount = computed(() => {
   const text = contentForCount.value.trim();
@@ -380,6 +401,37 @@ onBeforeUnmount(() => {
 
 .tag-input-wrap {
   display: inline-flex;
+  position: relative;
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 60;
+  margin-top: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+}
+
+.tag-suggestions button {
+  padding: 5px 10px;
+  font-size: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.tag-suggestions button:hover {
+  background: var(--bg-secondary);
+  color: var(--accent-color);
 }
 
 .tag-input {

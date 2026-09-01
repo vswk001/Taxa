@@ -20,8 +20,23 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .on_window_event(|window, event| {
+            // Close-to-tray: hide instead of exiting so the tray (and the
+            // quick-capture hotkey) stay alive. Toggleable from Settings.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    let state = window.app_handle().state::<Arc<AppState>>();
+                    if state.close_to_tray() {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+            }
+        })
         .setup(|app| {
             let data_dir = get_data_dir()?;
+            // Swap in staged restore data BEFORE opening the database.
+            commands::backup::complete_pending_restore(&data_dir);
             std::fs::create_dir_all(data_dir.join("notebooks").join("default").join("notes"))?;
             std::fs::create_dir_all(
                 data_dir
@@ -43,6 +58,8 @@ pub fn run() {
                     .blocking_write()
                     .set_providers(providers);
             }
+
+            setup_tray(app.handle())?;
 
             // Background maintenance: migrate a legacy FTS table to the
             // trigram tokenizer and reconcile link rows. These read every
@@ -79,6 +96,8 @@ pub fn run() {
             commands::notebook::get_note_links,
             commands::notebook::save_attachment,
             commands::notebook::get_vault_info,
+            commands::backup::backup_vault,
+            commands::backup::restore_vault,
             commands::capture::quick_capture,
             commands::capture::set_quick_capture_shortcut,
             commands::capture::hide_quick_capture,
@@ -101,10 +120,62 @@ pub fn run() {
             commands::settings::save_provider,
             commands::settings::delete_provider,
             commands::settings::reorder_providers,
+            commands::settings::set_close_to_tray,
             commands::graph::get_graph_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Taxa");
+}
+
+/// Tray icon + menu: keeps the app (and the global quick-capture hotkey)
+/// alive after the window is closed. Quit here is a real exit.
+fn setup_tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::TrayIconBuilder;
+
+    let show = MenuItem::with_id(app, "show", "打开 Taxa", true, None::<&str>)?;
+    let capture = MenuItem::with_id(app, "capture", "快捷捕获", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &capture, &quit])?;
+
+    let tray = TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().cloned().ok_or("no window icon")?)
+        .tooltip("Taxa")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "capture" => {
+                if let Some(w) = app.get_webview_window(commands::capture::QUICK_CAPTURE_WINDOW) {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                    let _ = w.center();
+                }
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    tray.set_visible(true).ok();
+    Ok(())
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 }
 
 fn get_data_dir() -> error::AppResult<PathBuf> {

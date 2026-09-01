@@ -22,6 +22,8 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
+      - name: Unit/component tests (vitest)
+        run: npm test
       - name: Type-check (vue-tsc)
         run: npx vue-tsc --noEmit
       - name: Build frontend

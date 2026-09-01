@@ -19,7 +19,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
@@ -42,3 +42,4 @@ toml = "0.8"
 dirs = { workspace = true }
 regex = "1"
 base64 = "0.22"
+zip = { version = "2", default-features = false, features = ["deflate"] }

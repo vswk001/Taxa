@@ -58,7 +58,7 @@ import { useI18n } from 'vue-i18n';
 import { useNotebookStore } from '@/stores/notebook';
 import { useEditorStore } from '@/stores/editor';
 
-defineProps<{ visible: boolean }>();
+const props = defineProps<{ visible: boolean; initialQuery?: string; initialScope?: string }>();
 const emit = defineEmits<{ close: [] }>();
 const { t } = useI18n();
 const notebookStore = useNotebookStore();
@@ -152,6 +152,21 @@ async function openResult(id: string) {
 watch(() => inputRef.value, (el) => {
   if (el) nextTick(() => el.focus());
 });
+
+// External jumps (tag panel) prefill and immediately run a scoped search.
+watch(
+  () => [props.visible, props.initialQuery, props.initialScope] as const,
+  ([v, q, sc]) => {
+    if (!v) return;
+    if (q !== undefined) query.value = q;
+    if (sc !== undefined) scope.value = sc;
+    if (q) {
+      searchError.value = '';
+      runSearch();
+    }
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   clearTimeout(debounceTimer);

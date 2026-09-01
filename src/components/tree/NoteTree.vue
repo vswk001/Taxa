@@ -9,6 +9,9 @@
         <button @click="handleNewFolder" :title="t('tree.newFolder')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         </button>
+        <button @click="tagsVisible = true" :title="t('tags.title')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </button>
         <button @click="openDailyNote" :title="t('tree.dailyNote')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         </button>
@@ -80,6 +83,7 @@
       @cancel="inputDialog.show = false"
     />
     <TrashPanel :visible="trashVisible" @close="trashVisible = false" />
+    <TagPanel :visible="tagsVisible" @close="tagsVisible = false" />
     <ConfirmDialog
       :visible="confirmState.visible"
       :message="confirmState.message"
@@ -102,6 +106,7 @@ import TreeNode from './TreeNode.vue';
 import InputDialog from '@/components/common/InputDialog.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import TrashPanel from './TrashPanel.vue';
+import TagPanel from './TagPanel.vue';
 import type { Folder, Note } from '@/types/notebook';
 
 const { t } = useI18n();
@@ -114,6 +119,7 @@ const isAllExpanded = ref(false);
 /** Guards the empty-state so it doesn't flash before the first load. */
 const loaded = ref(false);
 const trashVisible = ref(false);
+const tagsVisible = ref(false);
 
 function toggleExpandAll() {
   isAllExpanded.value = !isAllExpanded.value;
@@ -426,6 +432,10 @@ onMounted(async () => {
   notesChangedUnlisten = await listen('notes-changed', () => {
     void notebookStore.loadFolderTree().then(() => notebookStore.loadAllNotes());
   });
+  // Command palette entry points into this tree's panels/actions.
+  window.addEventListener('taxa:open-trash', () => { trashVisible.value = true; });
+  window.addEventListener('taxa:open-tags', () => { tagsVisible.value = true; });
+  window.addEventListener('taxa:open-daily', () => { void openDailyNote(); });
 });
 
 onBeforeUnmount(() => {

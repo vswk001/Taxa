@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run"
   },
   "dependencies": {
     "@milkdown/crepe": "^7.21.1",
@@ -28,8 +29,11 @@
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.9.1",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.5.0",
+    "happy-dom": "^20.12.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
+    "vitest": "^4.1.11",
     "vue-tsc": "^2.1.10"
   }
 }

@@ -63,6 +63,25 @@
               />
             </div>
             <p class="setting-hint">{{ t('settings.quickCaptureHint') }}</p>
+            <div class="section-title" style="margin-top: 24px;">{{ t('settings.traySection') }}</div>
+            <div class="setting-item">
+              <span class="setting-label">{{ t('settings.closeToTray') }}</span>
+              <input type="checkbox" v-model="closeToTray" @change="saveCloseToTray" />
+            </div>
+            <p class="setting-hint">{{ t('settings.closeToTrayHint') }}</p>
+            <div class="section-title" style="margin-top: 24px;">{{ t('settings.dataSection') }}</div>
+            <div class="setting-item">
+              <span class="setting-label">{{ t('settings.backupLabel') }}</span>
+              <div class="backup-actions">
+                <button class="backup-btn" :disabled="busyAction === 'backup'" @click="doBackup">
+                  {{ busyAction === 'backup' ? t('settings.backupWorking') : t('settings.backupNow') }}
+                </button>
+                <button class="backup-btn" :disabled="busyAction === 'restore'" @click="doRestore">
+                  {{ t('settings.restoreBackup') }}
+                </button>
+              </div>
+            </div>
+            <p class="setting-hint">{{ t('settings.backupHint') }}</p>
           </div>
 
           <!-- LLM 配置 -->
@@ -148,6 +167,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/stores/settings';
+import { invoke } from '@tauri-apps/api/core';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { setLocale, SUPPORTED_LOCALES } from '@/i18n';
 import { getVersion } from '@tauri-apps/api/app';
@@ -187,6 +207,8 @@ onMounted(async () => {
 
 const activeTab = ref('general');
 const quickCapture = ref(loadQuickCaptureSettings());
+const closeToTray = ref((localStorage.getItem('taxa-close-to-tray') ?? 'true') === 'true');
+const busyAction = ref<'' | 'backup' | 'restore'>('');
 const defaultAccelerator = DEFAULT_ACCELERATOR;
 const showForm = ref(false);
 const editingProvider = ref<LlmProvider | null>(null);
@@ -230,6 +252,43 @@ watch(() => props.visible, (v) => {
 
 function handleThemeChange() {
   setTheme(localTheme.value);
+}
+
+async function saveCloseToTray() {
+  localStorage.setItem('taxa-close-to-tray', String(closeToTray.value));
+  try {
+    await invoke('set_close_to_tray', { enabled: closeToTray.value });
+  } catch (e) {
+    console.error('failed to set close-to-tray:', e);
+  }
+}
+
+async function doBackup() {
+  busyAction.value = 'backup';
+  try {
+    const done = await invoke<boolean>('backup_vault');
+    if (done) await tauriMessage(t('settings.backupDone'), { kind: 'info' });
+  } catch (e) {
+    await tauriMessage(e instanceof Error ? e.message : String(e), { title: t('settings.backupFailed'), kind: 'error' });
+  } finally {
+    busyAction.value = '';
+  }
+}
+
+async function doRestore() {
+  const yes = await showConfirm(t('settings.restoreConfirm'));
+  if (!yes) return;
+  busyAction.value = 'restore';
+  try {
+    const staged = await invoke<boolean>('restore_vault');
+    if (staged) {
+      const { relaunch } = await import('@tauri-apps/plugin-process');
+      await relaunch();
+    }
+  } catch (e) {
+    await tauriMessage(e instanceof Error ? e.message : String(e), { title: t('settings.backupFailed'), kind: 'error' });
+    busyAction.value = '';
+  }
 }
 
 async function saveQuickCapture() {
@@ -360,6 +419,31 @@ async function setDefault(id: string) {
 
 .shortcut-input:disabled {
   opacity: 0.5;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.backup-btn {
+  padding: 5px 12px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.backup-btn:hover:not(:disabled) {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.backup-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .setting-hint {

@@ -136,3 +136,10 @@ pub async fn delete_provider(state: State<'_, Arc<AppState>>, id: String) -> App
 
     reload_engine_providers(&state.inner().clone()).await
 }
+
+/// Toggle hide-to-tray on window close.
+#[tauri::command]
+pub async fn set_close_to_tray(state: State<'_, Arc<AppState>>, enabled: bool) -> AppResult<()> {
+    state.set_close_to_tray(enabled);
+    Ok(())
+}

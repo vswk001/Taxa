@@ -15,6 +15,8 @@ pub struct AppState {
     ai_cancels: Mutex<HashMap<u32, Arc<AtomicBool>>>,
     /// Currently registered quick-capture accelerator, if any.
     pub quick_capture_shortcut: Mutex<Option<String>>,
+    /// Hide to tray on window close instead of exiting.
+    close_to_tray: std::sync::atomic::AtomicBool,
 }
 
 /// Lock the DB, mapping poisoning to an AppError instead of panicking.
@@ -45,6 +47,7 @@ impl AppState {
             ai_engine,
             ai_cancels: Mutex::new(HashMap::new()),
             quick_capture_shortcut: Mutex::new(None),
+            close_to_tray: std::sync::atomic::AtomicBool::new(true),
         })
     }
 
@@ -75,6 +78,16 @@ impl AppState {
             .map(|mut m| m.insert(seq, flag.clone()))
             .ok();
         flag
+    }
+
+    pub fn close_to_tray(&self) -> bool {
+        self.close_to_tray
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_close_to_tray(&self, value: bool) {
+        self.close_to_tray
+            .store(value, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Flag a request as cancelled; the streaming loop aborts at the next
