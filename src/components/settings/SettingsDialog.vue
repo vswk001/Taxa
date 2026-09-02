@@ -210,7 +210,7 @@ onMounted(async () => {
   try {
     appVersion.value = await getVersion();
   } catch {
-    appVersion.value = '0.4.3';
+    appVersion.value = '0.4.4';
   }
 });
 

@@ -1,4 +1,4 @@
-# Taxa v0.4.3
+# Taxa v0.4.4
 
 **[简体中文](#简体中文) | [English](#english)**
 
@@ -6,69 +6,45 @@
 
 ## 简体中文
 
-功能更新版本：标签管理、命令面板、备份/恢复、托盘常驻，以及更新前的版本说明预览。
+稳定性补丁：修复"打开即消失"的启动问题，并杜绝其根源。
 
-### ✨ 新特性
+### 🐛 修复
 
-#### 1. 查看版本更新内容
-应用内检测到新版本时，新增**「查看更新内容」**按钮：弹窗展示该版本的完整更新说明（新特性、修复清单），看完可直接在弹窗里安装。本版起升级前即可知道改了什么。
+#### 启动无窗口（表现为闪退）
+根因是一个连锁反应：应用内更新完成后自动重启时，可能留下一个**无窗口的后台残留进程**；之后再次更新时，该残留进程锁定程序文件导致**安装中途失败**，并损坏 WebView 数据目录——此后每次打开，进程启动但窗口永不出现，看起来就是闪退，且每次点击都会积累更多残留进程。
 
-#### 2. 标签管理
-- 标签输入**自动补全**：输入时从已有标签中匹配建议，点击即用
-- **标签面板**（目录树 🏷 按钮）：按使用量排序、显示计数，点击标签直接跳转该标签的搜索结果
-- **全局重命名**：重命名一个标签会应用到所有使用它的笔记；与已有标签同名时自动合并
+本版加入**单实例保护**（Tauri 官方插件）：再次启动时不再产生竞争进程，而是唤起并聚焦已有窗口。残留进程从此无法累积，更新时也不会再被旧进程锁死文件。
 
-#### 3. 命令面板（Ctrl+P）
-任何界面（包括编辑器内）按 `Ctrl+P` 呼出：统一入口搜索笔记、文件夹，或执行动作（新建笔记、每日笔记、搜索、图谱、标签、回收站、设置），支持键盘上下选择 + 回车执行。
-
-#### 4. 备份与恢复（设置 → 通用 → 数据）
-- **立即备份**：将数据库一致性快照 + 全部笔记、附件、回收站打包为一个 zip
-- **从备份恢复**：选择备份文件，确认后自动重启完成替换；恢复在数据库打开前执行，避免运行中替换导致损坏
-
-#### 5. 托盘常驻
-- 关闭主窗口默认**最小化到托盘**（设置中可关闭该行为），托盘菜单提供 打开 / 快捷捕获 / 退出
-- 常驻期间**全局快捷捕获热键持续可用**——"随时随地捕获"从此名副其实
-- 点击托盘图标恢复主窗口
-
-### 🔧 质量改进
-- 新增自动化回归测试套件（21 项），覆盖历史上所有已修复的关键缺陷（数据丢失、菜单失效、页签关闭等），每次提交自动运行
+#### 💡 如果你的应用现在正打不开（自救步骤）
+1. 打开任务管理器，结束所有 `taxa.exe` 进程（可能有好几个）
+2. 删除文件夹 `%LOCALAPPDATA%\com.taxa.desktop`（只是浏览器缓存，笔记数据不受影响）
+3. 重新打开 Taxa——应恢复正常
+4. 建议立即在 设置 → 关于 → 检查更新，升级到本版本以获得根治
 
 ### 🔄 升级
-- 应用内 设置 → 关于 → 检查更新，升级前可先「查看更新内容」
+- 应用内 设置 → 关于 → 检查更新（可先「查看更新内容」）
 
 ---
 
 ## English
 
-A feature release: tag management, command palette, backup/restore, tray residency, and release-notes preview before updating.
+A stability patch: fixes the "launches then vanishes" startup failure and eliminates its root cause.
 
-### ✨ Features
+### 🐛 Fixed
 
-#### 1. View release notes on update
-When an update is detected, a **What's New** button opens the full release notes (features and fixes) in-app, with an Install button right in the dialog — from this version on you always know what changed before upgrading.
+#### App opens with no window (perceived as an instant crash)
+Root cause was a chain reaction: after an in-app update, the automatic relaunch could leave a **headless background process** behind; a later update then **failed midway** because that zombie locked the executable, corrupting the WebView data folder — after which every launch started a process whose window never appeared (looking like a crash), with each attempt piling up more zombies.
 
-#### 2. Tag management
-- **Autocomplete** while typing tags, sourced from existing tags
-- **Tag panel** (tree header 🏷): usage-sorted with counts; clicking a tag jumps to a scoped search
-- **Global rename**: renames the tag across every note that uses it, merging into an existing tag on name collision
+This version adds a **single-instance guard** (official Tauri plugin): launching again now shows and focuses the existing window instead of spawning a competing process. Zombies can no longer accumulate, and updates can no longer be blocked by a stale process holding the executable.
 
-#### 3. Command palette (Ctrl+P)
-Summon from anywhere (editor included): search notes and folders or run actions (new note, daily note, search, graph, tags, trash, settings) with full keyboard navigation.
-
-#### 4. Backup & restore (Settings → General → Data)
-- **Back Up Now**: one zip containing a consistent database snapshot plus all notes, attachments, and the trash
-- **Restore from Backup**: pick a zip, confirm, and the app relaunches to complete the swap — restores are applied before the database opens, avoiding live-file corruption
-
-#### 5. Tray residency
-- Closing the main window hides to tray by default (toggleable); the tray menu offers Open / Quick Capture / Quit
-- The **global quick-capture hotkey keeps working** while the app sits in the tray
-- Click the tray icon to restore the window
-
-### 🔧 Quality
-- Added an automated regression suite (21 tests) covering every historically fixed critical bug (data loss, dead menus, tab closing, …), run on every push
+#### 💡 If your app currently won't open (recovery steps)
+1. Open Task Manager and end every `taxa.exe` process (there may be several)
+2. Delete the folder `%LOCALAPPDATA%\com.taxa.desktop` (browser cache only — your notes are unaffected)
+3. Launch Taxa again — it should come back
+4. Then update to this version (Settings → About → Check for Updates) for the permanent fix
 
 ### 🔄 Upgrading
-- Settings → About → Check for Updates — and preview What's New first
+- Settings → About → Check for Updates (preview What's New first if you like)
 
 ---
 
@@ -76,7 +52,7 @@ Summon from anywhere (editor included): search notes and folders or run actions 
 
 | 平台 / Platform | 资产 / Asset |
 |---|---|
-| Windows | `Taxa_0.4.3_x64-setup.exe` / `.msi` |
-| macOS (Apple Silicon + Intel) | `Taxa_0.4.3_universal.dmg` |
+| Windows | `Taxa_0.4.4_x64-setup.exe` / `.msi` |
+| macOS (Apple Silicon + Intel) | `Taxa_0.4.4_universal.dmg` |
 | Linux | `.AppImage` / `.deb` / `.rpm` |
 | MCP 服务器 / MCP server | `taxa-mcp-*` |
