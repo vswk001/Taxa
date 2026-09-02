@@ -14,6 +14,19 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // MUST be the first plugin: every launch reuses the single existing
+        // instance instead of spawning a competing one. Without this, hidden
+        // zombie instances accumulate (e.g. after an updater relaunch) and
+        // both steal the webview data dir and lock taxa.exe against future
+        // passive updates — the exact combination that produced the
+        // "launches then vanishes" reports.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
