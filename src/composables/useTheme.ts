@@ -1,4 +1,5 @@
 import { ref, watchEffect } from 'vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -17,6 +18,16 @@ function applyTheme(t: Theme) {
   }
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   localStorage.setItem(STORAGE_KEY, t);
+
+  // Keep the native title bar in sync with the content — otherwise the OS
+  // paints a white bar above a dark window ( glaring on Windows).
+  // Setting the RESOLVED theme (not null) keeps the bar matched even when
+  // the user's choice differs from the OS preference.
+  void getCurrentWindow()
+    .setTheme(isDark ? 'dark' : 'light')
+    .catch(() => {
+      /* title-bar theming unsupported on this platform */
+    });
 }
 
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
