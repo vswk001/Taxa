@@ -1,5 +1,14 @@
 <template>
-  <div ref="containerRef" class="milkdown-container" @paste="onPaste" @drop.prevent="onDrop" @mouseup="updateSelectionPanel" @keyup="updateSelectionPanel">
+  <div
+    ref="containerRef"
+    class="milkdown-container"
+    @paste="onPaste"
+    @drop.prevent="onDrop"
+    @mouseup="updateSelectionPanel"
+    @keyup="updateSelectionPanel"
+    @input="checkLinkAutocomplete"
+    @keydown.capture="onLinkSuggestKey"
+  >
     <Milkdown />
     <SelectionAiPanel
       :visible="selectionAi.visible"
@@ -11,6 +20,15 @@
       @action="runSelectionAction"
       @apply="applySelectionResult"
       @cancel="hideSelectionPanel"
+    />
+    <LinkSuggest
+      :visible="linkSuggest.visible"
+      :x="linkSuggest.x"
+      :y="linkSuggest.y"
+      :items="linkSuggest.items"
+      :selected="linkSuggest.selected"
+      @pick="pickLinkSuggestion"
+      @hover="linkSuggest.selected = $event"
     />
   </div>
 </template>
@@ -26,8 +44,11 @@ import { EditorState } from 'prosemirror-state';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import SelectionAiPanel from './SelectionAiPanel.vue';
+import LinkSuggest from './LinkSuggest.vue';
+import { useNotebookStore } from '@/stores/notebook';
 
 const { t, locale } = useI18n();
+const notebookStore = useNotebookStore();
 
 const props = defineProps<{ modelValue: string; noteId?: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -130,6 +151,105 @@ let currentMarkdown = props.modelValue;
 // Values arriving while the editor is still initializing are queued and
 // applied once it is ready (previously they were silently dropped).
 let pendingValue: string | null = null;
+
+// ---- [[wikilink autocomplete ---------------------------------------------
+// Typing [[ shows matching note titles; picking one completes the link in
+// place. The replacement range covers the raw "[[query" text.
+const linkSuggest = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  items: [] as string[],
+  selected: 0,
+});
+let linkRange: { from: number; to: number } | null = null;
+
+function checkLinkAutocomplete() {
+  const editor = getInstance();
+  if (!editor || loading.value || !props.noteId) {
+    linkSuggest.value.visible = false;
+    linkRange = null;
+    return;
+  }
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const head = view.state.selection.to;
+    const before = view.state.doc.textBetween(Math.max(0, head - 60), head, '\n');
+    const match = /\[\[([^\[\]\n]*)$/.exec(before);
+    if (!match) {
+      linkSuggest.value.visible = false;
+      linkRange = null;
+      return;
+    }
+    const query = match[1].toLowerCase();
+    const currentId = props.noteId ?? '';
+    const seen = new Set<string>();
+    const items = notebookStore.notes
+      .filter((n) => n.id !== currentId)
+      .map((n) => n.title)
+      .filter((title) => {
+        if (seen.has(title)) return false;
+        seen.add(title);
+        return title.toLowerCase().includes(query);
+      })
+      .slice(0, 8);
+    if (!items.length) {
+      linkSuggest.value.visible = false;
+      linkRange = null;
+      return;
+    }
+    linkRange = { from: head - match[0].length, to: head };
+    try {
+      const coords = view.coordsAtPos(head);
+      linkSuggest.value = {
+        visible: true,
+        x: coords.left,
+        y: coords.bottom + 6,
+        items,
+        selected: 0,
+      };
+    } catch {
+      linkSuggest.value.visible = false;
+    }
+  });
+}
+
+/** Intercept navigation keys while the popup is open (capture phase, so the
+ *  editor never sees them). */
+function onLinkSuggestKey(e: KeyboardEvent) {
+  if (!linkSuggest.value.visible) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    e.stopPropagation();
+    const count = linkSuggest.value.items.length;
+    linkSuggest.value.selected =
+      (linkSuggest.value.selected + (e.key === 'ArrowDown' ? 1 : -1) + count) % count;
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    e.stopPropagation();
+    pickLinkSuggestion(linkSuggest.value.items[linkSuggest.value.selected]);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    linkSuggest.value.visible = false;
+  }
+}
+
+function pickLinkSuggestion(title: string) {
+  const range = linkRange;
+  const editor = getInstance();
+  if (!range || !editor || loading.value) {
+    linkSuggest.value.visible = false;
+    return;
+  }
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    view.dispatch(view.state.tr.insertText(`[[${title}]] `, range.from, range.to));
+    view.focus();
+  });
+  linkSuggest.value.visible = false;
+  linkRange = null;
+}
 
 // ---- image attachments ---------------------------------------------------
 // Markdown stores portable relative paths (attachments/x.png); the webview

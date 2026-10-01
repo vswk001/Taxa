@@ -3,6 +3,7 @@ pub mod ai;
 pub mod backup;
 pub mod capture;
 pub mod graph;
+pub mod library;
 pub mod notebook;
 pub mod search;
 pub mod settings;

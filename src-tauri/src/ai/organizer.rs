@@ -82,6 +82,26 @@ fn parse_error(prefix: &str, err: &serde_json::Error, raw: &str) -> AppError {
     ))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibrarySuggestion {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub note_id: String,
+    #[serde(default)]
+    pub target_folder: Option<String>,
+    #[serde(default)]
+    pub merge_with_id: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibraryCheckResult {
+    pub suggestions: Vec<LibrarySuggestion>,
+}
+
 pub struct AiOrganizer;
 
 impl AiOrganizer {
@@ -185,6 +205,26 @@ impl AiOrganizer {
             None => provider.chat(messages, options).await?,
         };
         Ok(response.content)
+    }
+
+    /// Library health check: returns move/merge/tag suggestions.
+    pub async fn library_check(
+        config: ProviderConfig,
+        notes_json: &str,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<LibraryCheckResult> {
+        let provider = create_provider(&config)?;
+        let messages = PromptTemplates::library_check(notes_json, locale);
+        let options = ChatOptions {
+            max_tokens: 4096,
+            ..ChatOptions::default()
+        };
+        let response = provider.chat(messages, options).await?;
+        crate::ai::provider::err_if_cancelled(&cancel)?;
+        let json_str = extract_json(&response.content);
+        serde_json::from_str(json_str)
+            .map_err(|e| parse_error("AI 返回格式错误", &e, &response.content))
     }
 
     /// Inline action on selected editor text; returns the transformed text.

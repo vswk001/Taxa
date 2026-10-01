@@ -87,6 +87,7 @@ pub fn run() {
                             let _ = notebook::service::NotebookService::rebuild_fts(&db, &md);
                         }
                         let _ = link::graph::rebuild_links(&db, &state.notes_dir());
+                        commands::backup::maybe_run_auto_backup(&state);
                     }
                 });
             }
@@ -129,11 +130,18 @@ pub fn run() {
             commands::ai::ai_cancel,
             commands::ai::ai_ask_notes,
             commands::ai::ai_text_action,
+            commands::library::ai_library_check,
+            commands::library::ai_library_apply,
+            commands::library::list_ai_operations,
+            commands::library::undo_ai_operation,
             commands::settings::list_providers,
             commands::settings::save_provider,
             commands::settings::delete_provider,
             commands::settings::reorder_providers,
             commands::settings::set_close_to_tray,
+            commands::settings::save_window_state,
+            commands::backup::get_auto_backup,
+            commands::backup::set_auto_backup,
             commands::graph::get_graph_data,
         ])
         .run(tauri::generate_context!())

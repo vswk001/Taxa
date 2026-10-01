@@ -37,6 +37,8 @@ export interface ChatMessage {
   fallbackInfo?: { failed: string; next: string };
   /** Notes cited by an ask-mode answer. */
   sources?: { id: string; title: string; folder: string }[];
+  /** Library health-check suggestions attached to this message. */
+  librarySuggestions?: import('./ai-extended').LibraryItem[];
 }
 
 /** Mirrors the Rust StreamEvent enum (serde tag="type", content="text"). */

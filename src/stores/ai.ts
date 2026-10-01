@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { ChatMessage, FileAttachment, StreamEventPayload } from '@/types/ai';
-import type { OrganizeResult } from '@/types/ai-extended';
+import type { OrganizeResult, LibrarySuggestion } from '@/types/ai-extended';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import i18n from '@/i18n';
@@ -231,6 +231,68 @@ export const useAiStore = defineStore('ai', () => {
     }
   }
 
+  /** Library health check: one message carrying all suggestions; each is
+   *  applied/skipped individually (applies are undoable via the history). */
+  async function runLibraryCheck() {
+    const seq = ++requestSeq;
+    const aiMsgId = crypto.randomUUID();
+    messages.value.push({
+      id: aiMsgId,
+      role: 'assistant',
+      content: t('ai.libChecking'),
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+    });
+    isProcessing.value = true;
+    try {
+      const suggestions = await withTimeout(
+        invoke<LibrarySuggestion[]>('ai_library_check', { seq, locale: currentLocale() }),
+        120_000,
+        seq,
+      );
+      if (seq !== requestSeq) return;
+      const msg = messages.value.find((m) => m.id === aiMsgId);
+      if (!msg) return;
+      msg.librarySuggestions = suggestions.map((suggestion) => ({ suggestion, status: 'pending' as const }));
+      msg.content = suggestions.length
+        ? t('ai.libResultCount', { n: suggestions.length })
+        : t('ai.libNoSuggestions');
+      msg.status = 'done';
+    } catch (e: unknown) {
+      if (seq !== requestSeq) return;
+      const msg = messages.value.find((m) => m.id === aiMsgId);
+      if (msg) {
+        msg.content = t('ai.processFailed', { msg: extractError(e) });
+        msg.status = 'error';
+      }
+    } finally {
+      if (seq === requestSeq) isProcessing.value = false;
+    }
+  }
+
+  async function applyLibrarySuggestion(msgId: string, index: number) {
+    const msg = messages.value.find((m) => m.id === msgId);
+    const item = msg?.librarySuggestions?.[index];
+    if (!msg || !item || item.status !== 'pending') return;
+    item.status = 'applying';
+    try {
+      await invoke('ai_library_apply', { suggestion: item.suggestion });
+      item.status = 'done';
+      const notebookStore = useNotebookStore();
+      await notebookStore.loadFolderTree();
+      await notebookStore.loadAllNotes();
+    } catch (e) {
+      console.error('library apply failed:', e);
+      item.status = 'error';
+    }
+  }
+
+  function skipLibrarySuggestion(msgId: string, index: number) {
+    const msg = messages.value.find((m) => m.id === msgId);
+    const item = msg?.librarySuggestions?.[index];
+    if (item) item.status = 'done';
+  }
+
   /** Mark the current request cancelled locally and abort it in the backend. */
   function cancel() {
     const seq = requestSeq;
@@ -405,5 +467,5 @@ export const useAiStore = defineStore('ai', () => {
     lastResult.value = null;
   }
 
-  return { messages, isProcessing, lastResult, mode, submitInput, cancel, applyResult, dismiss, optimizeNote, applyOptimize, askNote, clearMessages };
+  return { messages, isProcessing, lastResult, mode, submitInput, cancel, applyResult, dismiss, optimizeNote, applyOptimize, askNote, runLibraryCheck, applyLibrarySuggestion, skipLibrarySuggestion, clearMessages };
 });

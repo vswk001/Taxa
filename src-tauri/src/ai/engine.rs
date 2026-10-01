@@ -104,6 +104,18 @@ impl AiEngine {
         .await
     }
 
+    pub async fn library_check(
+        providers: &[ProviderConfig],
+        notes_json: &str,
+        cancel: CancelToken,
+        locale: &str,
+    ) -> AppResult<crate::ai::organizer::LibraryCheckResult> {
+        Self::try_providers(providers, &None, cancel, |config, _cb, cancel| {
+            AiOrganizer::library_check(config, notes_json, cancel, locale)
+        })
+        .await
+    }
+
     fn notify_fallback(
         on_event: &Option<StreamCallback>,
         failed: &ProviderConfig,

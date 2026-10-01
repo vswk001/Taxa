@@ -111,6 +111,146 @@ fn zip_err(e: zip::result::ZipError) -> AppError {
     AppError::FileIo(e.to_string())
 }
 
+/// Build the backup zip at `zip_path` (consistent DB snapshot + notebooks +
+/// trash). Shared by the manual command and the weekly auto-backup.
+pub fn create_backup_zip(state: &AppState, zip_path: &Path) -> AppResult<()> {
+    // Consistent DB snapshot that folds in any WAL state.
+    let snapshot = state.data_dir.join("backup-snapshot.db");
+    let _ = std::fs::remove_file(&snapshot);
+    {
+        let db = lock_db(state)?;
+        db.conn().execute(
+            "VACUUM INTO ?1",
+            rusqlite::params![snapshot.to_string_lossy()],
+        )?;
+    }
+
+    let file = File::create(zip_path)?;
+    let mut zip = ZipWriter::new(file);
+    zip.start_file("taxa.db", SimpleFileOptions::default())
+        .map_err(zip_err)?;
+    File::open(&snapshot)
+        .and_then(|mut f| {
+            let mut buf = Vec::new();
+            f.read_to_end(&mut buf)?;
+            zip.write_all(&buf)
+        })
+        .map_err(|e| AppError::FileIo(e.to_string()))?;
+
+    // The whole notebooks tree (notes + attachments) plus trash.
+    let notebooks = state.data_dir.join("notebooks");
+    add_dir_to_zip(&mut zip, &state.data_dir, &notebooks, "notebooks")?;
+    add_dir_to_zip(&mut zip, &state.data_dir, &state.trash_dir(), "trash")?;
+
+    zip.finish().map_err(zip_err)?;
+    let _ = std::fs::remove_file(&snapshot);
+    Ok(())
+}
+
+const AUTO_BACKUP_CONFIG: &str = "auto-backup.json";
+const AUTO_BACKUP_DIR: &str = "backups";
+const AUTO_BACKUP_INTERVAL_DAYS: i64 = 7;
+const AUTO_BACKUP_KEEP: usize = 4;
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct AutoBackupConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub last_run: Option<String>,
+}
+
+fn read_auto_backup_config(state: &AppState) -> AutoBackupConfig {
+    std::fs::read_to_string(state.data_dir.join(AUTO_BACKUP_CONFIG))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+/// Weekly zip into data_dir/backups/, keeping the last few. Runs from the
+/// startup maintenance thread — failures only log (never block startup).
+pub fn maybe_run_auto_backup(state: &AppState) {
+    let config = read_auto_backup_config(state);
+    if !config.enabled {
+        return;
+    }
+    let due = match &config.last_run {
+        None => true,
+        Some(last) => chrono::DateTime::parse_from_rfc3339(last)
+            .map(|t| {
+                (chrono::Utc::now() - t.with_timezone(&chrono::Utc)).num_days()
+                    >= AUTO_BACKUP_INTERVAL_DAYS
+            })
+            .unwrap_or(true),
+    };
+    if !due {
+        return;
+    }
+    eprintln!("[auto-backup] due, running");
+    let dir = state.data_dir.join(AUTO_BACKUP_DIR);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let name = format!(
+        "auto-taxa-{}.zip",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    );
+    if let Err(e) = create_backup_zip(state, &dir.join(name)) {
+        eprintln!("[auto-backup] failed: {e}");
+        return;
+    }
+    // Prune old automatic backups, newest first.
+    let mut autos: Vec<_> = std::fs::read_dir(&dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.starts_with("auto-taxa-"))
+                        .unwrap_or(false)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    autos.sort();
+    while autos.len() > AUTO_BACKUP_KEEP {
+        let oldest = autos.remove(0);
+        let _ = std::fs::remove_file(oldest);
+    }
+
+    let mut config = config;
+    config.last_run = Some(chrono::Utc::now().to_rfc3339());
+    let _ = std::fs::write(
+        state.data_dir.join(AUTO_BACKUP_CONFIG),
+        serde_json::to_string(&config).unwrap_or_default(),
+    );
+    eprintln!("[auto-backup] done");
+}
+
+#[tauri::command]
+pub async fn get_auto_backup(state: State<'_, Arc<AppState>>) -> AppResult<AutoBackupConfig> {
+    Ok(read_auto_backup_config(state.inner()))
+}
+
+#[tauri::command]
+pub async fn set_auto_backup(
+    state: State<'_, Arc<AppState>>,
+    enabled: bool,
+) -> AppResult<AutoBackupConfig> {
+    let state = state.inner().clone();
+    crate::commands::notebook::run_blocking(move || {
+        let mut config = read_auto_backup_config(&state);
+        config.enabled = enabled;
+        std::fs::write(
+            state.data_dir.join(AUTO_BACKUP_CONFIG),
+            serde_json::to_string(&config)?,
+        )?;
+        Ok(config)
+    })
+    .await
+}
+
 /// Zip a consistent snapshot: DB via VACUUM INTO + notebooks/ + trash/.
 #[tauri::command]
 pub async fn backup_vault(app: AppHandle, state: State<'_, Arc<AppState>>) -> AppResult<bool> {

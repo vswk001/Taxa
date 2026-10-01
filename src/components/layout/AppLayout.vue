@@ -53,6 +53,7 @@
       :initial-scope="searchPreset.scope"
       @close="showSearch = false; searchPreset = { query: undefined, scope: undefined }"
     />
+    <ShortcutsDialog :visible="shortcutsVisible" @close="shortcutsVisible = false" />
     <CommandPalette
       :visible="showPalette"
       @close="showPalette = false"
@@ -76,6 +77,8 @@ import TabBar from '@/components/editor/TabBar.vue';
 import AiSidebar from '@/components/ai/AiSidebar.vue';
 import SearchPanel from '@/components/search/SearchPanel.vue';
 import CommandPalette from '@/components/layout/CommandPalette.vue';
+import ShortcutsDialog from '@/components/layout/ShortcutsDialog.vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import GraphView from '@/components/graph/GraphView.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import { loadQuickCaptureSettings, applyQuickCaptureShortcut } from '@/composables/useQuickCapture';
@@ -85,6 +88,7 @@ const notebookStore = useNotebookStore();
 const editorStore = useEditorStore();
 const showSearch = ref(false);
 const showPalette = ref(false);
+const shortcutsVisible = ref(false);
 const searchPreset = ref<{ query?: string; scope?: string }>({});
 const showSettings = ref(false);
 const sidebarVisible = ref(true);
@@ -114,6 +118,7 @@ function runPaletteAction(id: string) {
     case 'tags': window.dispatchEvent(new CustomEvent('taxa:open-tags')); break;
     case 'daily': window.dispatchEvent(new CustomEvent('taxa:open-daily')); break;
     case 'settings': showSettings.value = true; break;
+    case 'shortcuts': shortcutsVisible.value = true; break;
   }
 }
 
@@ -183,6 +188,11 @@ function handleKeyboard(e: KeyboardEvent) {
   if (target?.isContentEditable || target?.closest('.ProseMirror, input, textarea, [contenteditable]')) {
     return;
   }
+  if (e.key === '?') {
+    e.preventDefault();
+    shortcutsVisible.value = !shortcutsVisible.value;
+    return;
+  }
   if (ctrl && e.key === 'k') { e.preventDefault(); showSearch.value = !showSearch.value; }
   if (ctrl && e.key === 'g') { e.preventDefault(); openGraphTab(); }
   if (ctrl && e.key === 'b') { e.preventDefault(); sidebarVisible.value = !sidebarVisible.value; }
@@ -193,6 +203,31 @@ onMounted(() => {
   restoreTabSession();
   // Tag panel jumps: open the search panel scoped to the tag.
   window.addEventListener('taxa:search-tag', onSearchTag);
+  // Persist window geometry (debounced) for the next launch.
+  {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const win = getCurrentWindow();
+    const save = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        try {
+          const pos = await win.outerPosition();
+          const size = await win.outerSize();
+          const maximized = await win.isMaximized();
+          invoke('save_window_state', {
+            x: Math.round(pos.x / (await win.scaleFactor())),
+            y: Math.round(pos.y / (await win.scaleFactor())),
+            width: size.width,
+            height: size.height,
+            maximized,
+          }).catch(console.error);
+        } catch { /* window gone */ }
+      }, 800);
+    };
+    void win.onResized(save);
+    void win.onMoved(save);
+  }
+
   // Apply the stored close-to-tray preference (backend defaults to on).
   invoke('set_close_to_tray', {
     enabled: (localStorage.getItem('taxa-close-to-tray') ?? 'true') === 'true',

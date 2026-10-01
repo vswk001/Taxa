@@ -136,6 +136,48 @@ jobs:
           # bundler demand the private key).
           args: ${{ matrix.args }}${{ steps.signing.outputs.signed == 'false' && ' --config no-updater-config.json' || '' }}
 
+  # tauri-action occasionally races GitHub's API right after creating the
+  # release and writes latest.json with an empty notes field (seen on
+  # v0.4.5). Patch it from RELEASE_NOTES.md when that happens.
+  patch-manifest-notes:
+    permissions:
+      contents: write
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Patch empty notes in latest.json
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+        run: |
+          set -e
+          mkdir -p dl
+          if ! gh release download "$TAG" -p latest.json -O dl/latest.json; then
+            echo "no latest.json asset; nothing to patch"; exit 0
+          fi
+          if python3 - <<'PY'
+          import json,sys
+          d=json.load(open('dl/latest.json',encoding='utf-8'))
+          sys.exit(0 if d.get('notes') else 1)
+          PY
+          then
+            echo "notes already present"; exit 0
+          fi
+          python3 - <<'PY'
+          import json
+          notes=open('RELEASE_NOTES.md',encoding='utf-8').read()
+          d=json.load(open('dl/latest.json',encoding='utf-8'))
+          d['notes']=notes
+          json.dump(d,open('dl/latest.json','w',encoding='utf-8'),ensure_ascii=False)
+          PY
+          gh release upload "$TAG" dl/latest.json --clobber
+          echo "notes patched into latest.json"
+
   # Standalone taxa-mcp binaries, uploaded to the same release. Runs after the
   # app release exists. Native per-platform build (universal on macOS).
   mcp-binaries:

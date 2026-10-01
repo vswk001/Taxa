@@ -143,3 +143,22 @@ pub async fn set_close_to_tray(state: State<'_, Arc<AppState>>, enabled: bool) -
     state.set_close_to_tray(enabled);
     Ok(())
 }
+
+/// Persist the main window geometry so the next launch restores it.
+#[tauri::command]
+pub async fn save_window_state(
+    state: State<'_, Arc<AppState>>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+) -> AppResult<()> {
+    let state = state.inner().clone();
+    crate::commands::notebook::run_blocking(move || {
+        let json = serde_json::json!({ "x": x, "y": y, "width": width, "height": height, "maximized": maximized });
+        std::fs::write(state.data_dir.join("window-state.json"), json.to_string())?;
+        Ok(())
+    })
+    .await
+}

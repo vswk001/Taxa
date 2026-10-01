@@ -63,6 +63,7 @@ const ACTIONS: PaletteItem[] = [
   { kind: 'action', id: 'tags', label: '', icon: '🏷' },
   { kind: 'action', id: 'trash', label: '', icon: '🗑' },
   { kind: 'action', id: 'settings', label: '', icon: '⚙️' },
+  { kind: 'action', id: 'shortcuts', label: '', icon: '⌨️' },
 ];
 
 const results = computed<PaletteItem[]>(() => {

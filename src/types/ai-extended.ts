@@ -12,3 +12,17 @@ export interface OrganizeResult {
   complexity: Complexity;
   reasoning?: string;
 }
+
+export interface LibrarySuggestion {
+  type: string; // serde rename in Rust sends "type"
+  note_id: string;
+  target_folder?: string | null;
+  merge_with_id?: string | null;
+  tags: string[];
+  reason: string;
+}
+
+export interface LibraryItem {
+  suggestion: LibrarySuggestion;
+  status: 'pending' | 'applying' | 'done' | 'error';
+}

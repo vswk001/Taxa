@@ -3,6 +3,8 @@
     <div class="sidebar-header">
       <span>{{ t('ai.assistant') }}</span>
       <div class="header-actions">
+        <button @click="runCheck" :disabled="aiStore.isProcessing" :title="t('ai.libraryCheck')">🩺</button>
+        <button @click="openHistory" :title="t('ai.libraryHistory')">🕘</button>
         <button v-if="aiStore.messages.length > 0" @click="aiStore.clearMessages()" :title="t('ai.clearChat')">🗑</button>
         <button :class="{ active: showConfig }" @click="showConfig = !showConfig" :title="t('ai.llmConfig')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -54,6 +56,8 @@
         @apply-optimize="onApplyOptimize"
         @dismiss="aiStore.dismiss($event)"
         @open-note="openNoteById"
+        @lib-apply="aiStore.applyLibrarySuggestion($event.msgId, $event.index)"
+        @lib-skip="aiStore.skipLibrarySuggestion($event.msgId, $event.index)"
       />
       <div v-if="aiStore.isProcessing" class="processing-bar">
         <span class="processing-text">{{ t('ai.processing') }}</span>
@@ -70,6 +74,28 @@
         <ChatInput :disabled="aiStore.isProcessing" :mode="aiStore.mode" @submit="handleSubmit" />
       </div>
     </div>
+    <Teleport to="body">
+      <div v-if="historyVisible" class="history-overlay" @click.self="historyVisible = false">
+        <div class="history-dialog">
+          <div class="history-header">
+            <span>{{ t('ai.libraryHistory') }}</span>
+            <button class="close-btn" @click="historyVisible = false">×</button>
+          </div>
+          <div class="history-list">
+            <div v-if="!history.length" class="history-empty">{{ t('ai.historyEmpty') }}</div>
+            <div v-for="op in history" :key="op.id" class="history-item">
+              <span class="history-type">{{ opLabel(op.operation_type) }}</span>
+              <span class="history-time">{{ op.created_at.slice(0, 16).replace('T', ' ') }}</span>
+              <button
+                v-if="op.operation_type.startsWith('library-')"
+                class="undo-btn"
+                @click="undoOp(op.id)"
+              >{{ t('ai.undo') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
     <ConfirmDialog
       :visible="confirmVisible"
       :message="confirmMsg"
@@ -89,6 +115,7 @@ import { useNotebookStore } from '@/stores/notebook';
 import { useSettingsStore } from '@/stores/settings';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import type { LlmProvider, LlmProviderForm as LlmProviderFormType } from '@/types/settings';
+import { invoke } from '@tauri-apps/api/core';
 import { useProviderDrag } from '@/composables/useProviderDrag';
 import ChatArea from './ChatArea.vue';
 import ChatInput from './ChatInput.vue';
@@ -124,6 +151,51 @@ async function openNoteById(id: string) {
   if (note) {
     const { useEditorStore } = await import('@/stores/editor');
     useEditorStore().openTab(note.note.id, note.note.title);
+  }
+}
+
+async function runCheck() {
+  await aiStore.runLibraryCheck();
+}
+
+interface HistoryOp {
+  id: string;
+  note_id: string | null;
+  operation_type: string;
+  after_state: string | null;
+  created_at: string;
+}
+
+const historyVisible = ref(false);
+const history = ref<HistoryOp[]>([]);
+
+async function openHistory() {
+  historyVisible.value = true;
+  try {
+    history.value = await invoke<HistoryOp[]>('list_ai_operations');
+  } catch (e) {
+    console.error('failed to list ai operations:', e);
+  }
+}
+
+function opLabel(type: string): string {
+  if (type === 'library-move') return t('ai.libMoveOp');
+  if (type === 'library-tag') return t('ai.libTagOp');
+  if (type === 'library-merge') return t('ai.libMergeOp');
+  return t('ai.libOrganizeOp');
+}
+
+async function undoOp(id: string) {
+  try {
+    await invoke('undo_ai_operation', { opId: id });
+    await openHistory();
+    const nb = useNotebookStore();
+    await nb.loadFolderTree();
+    await nb.loadAllNotes();
+  } catch (e) {
+    console.error('undo failed:', e);
+    const { message } = await import('@tauri-apps/plugin-dialog');
+    await message(e instanceof Error ? e.message : String(e), { title: t('ai.undoFailed'), kind: 'error' });
   }
 }
 
@@ -226,6 +298,61 @@ async function setDefault(id: string) {
 }
 .header-actions button:hover { background: var(--border-color); }
 .header-actions button.active { color: var(--accent-color); background: var(--border-color); }
+
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-dialog {
+  width: 460px;
+  max-height: 420px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.history-header .close-btn {
+  background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-secondary);
+}
+
+.history-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+.history-empty { padding: 30px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+
+.history-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-bottom: 1px solid var(--border-color); font-size: 12px;
+}
+
+.history-type { flex: 1; color: var(--text-primary); }
+
+.history-time { color: var(--text-secondary); font-size: 11px; }
+
+.undo-btn {
+  padding: 2px 10px; font-size: 11px; border-radius: 4px;
+  border: 1px solid var(--border-color); background: none; cursor: pointer; color: var(--text-primary);
+}
+
+.undo-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
 
 .config-panel {
   flex: 1; overflow-y: auto; padding: 12px;

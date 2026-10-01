@@ -33,6 +33,13 @@
       <div v-if="msg.attachments?.length" class="msg-attachments">
         <span v-for="a in msg.attachments" :key="a.name" class="msg-file-chip">📎 {{ a.name }}</span>
       </div>
+      <LibraryCheckCard
+        v-if="msg.librarySuggestions?.length"
+        :items="msg.librarySuggestions"
+        :title-map="notebookStore.notes.reduce((acc, n) => { acc[n.id] = n.title; return acc; }, {} as Record<string, string>)"
+        @apply="emit('libApply', { msgId: msg.id, index: $event })"
+        @skip="emit('libSkip', { msgId: msg.id, index: $event })"
+      />
       <OperationCard
         v-if="msg.suggestions?.length"
         :suggestion="msg.suggestions[0]"
@@ -49,11 +56,16 @@ import { useI18n } from 'vue-i18n';
 import type { ChatMessage, AiSuggestion } from '@/types/ai';
 import type { OrganizeResult } from '@/types/ai-extended';
 import OperationCard from './OperationCard.vue';
+import LibraryCheckCard from './LibraryCheckCard.vue';
+import { useNotebookStore } from '@/stores/notebook';
 
 const { t } = useI18n();
+const notebookStore = useNotebookStore();
 
 const props = defineProps<{ messages: ChatMessage[] }>();
 const emit = defineEmits<{
+  libApply: [payload: { msgId: string; index: number }];
+  libSkip: [payload: { msgId: string; index: number }];
   openNote: [id: string];
   apply: [payload: { result: OrganizeResult; msgId: string }];
   applyOptimize: [payload: { noteId: string; title: string; content: string; msgId: string }];

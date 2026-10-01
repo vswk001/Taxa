@@ -82,6 +82,11 @@
               </div>
             </div>
             <p class="setting-hint">{{ t('settings.backupHint') }}</p>
+            <div class="setting-item" style="margin-top: 14px;">
+              <span class="setting-label">{{ t('settings.autoBackup') }}</span>
+              <input type="checkbox" v-model="autoBackup" @change="saveAutoBackup" />
+            </div>
+            <p class="setting-hint">{{ t('settings.autoBackupHint') }}</p>
           </div>
 
           <!-- LLM 配置 -->
@@ -219,6 +224,22 @@ const quickCapture = ref(loadQuickCaptureSettings());
 const closeToTray = ref((localStorage.getItem('taxa-close-to-tray') ?? 'true') === 'true');
 const busyAction = ref<'' | 'backup' | 'restore'>('');
 const notesVisible = ref(false);
+const autoBackup = ref(false);
+
+void (async () => {
+  try {
+    const cfg = await invoke<{ enabled: boolean }>('get_auto_backup');
+    autoBackup.value = cfg.enabled;
+  } catch { /* defaults */ }
+})();
+
+async function saveAutoBackup() {
+  try {
+    await invoke('set_auto_backup', { enabled: autoBackup.value });
+  } catch (e) {
+    console.error('failed to set auto backup:', e);
+  }
+}
 const defaultAccelerator = DEFAULT_ACCELERATOR;
 const showForm = ref(false);
 const editingProvider = ref<LlmProvider | null>(null);
