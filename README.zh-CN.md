@@ -40,6 +40,16 @@ Taxa 是一款内置 AI 助手的笔记应用。写下或粘贴任意文字，AI
 - **主题**——亮色、暗色、跟随系统。
 - **凭证安全**——API Key 存入系统钥匙串，不明文落盘。
 
+## 📸 界面截图
+
+| 主界面 | 笔记图谱 |
+|---|---|
+| ![主界面](docs/screenshots/main-ui.png) | ![图谱](docs/screenshots/graph-view.png) |
+
+| 快捷捕获 (Ctrl+Alt+N) | 命令面板 (Ctrl+P) |
+|---|---|
+| ![快捷捕获](docs/screenshots/quick-capture.png) | ![命令面板](docs/screenshots/command-palette.png) |
+
 ## 📥 从源码构建
 
 预编译二进制见 [Releases 页面](https://github.com/vswk001/Taxa/releases)。也可以自行构建：

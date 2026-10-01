@@ -45,6 +45,16 @@ It also ships an **MCP server**, so tools like Claude Code and Codex can search 
 - **Themes** — light, dark, or follow system.
 - **Secure credentials** — API keys are stored in the OS keyring, not in plain text.
 
+## 📸 Screenshots
+
+| Main UI | Note Graph |
+|---|---|
+| ![Main UI](docs/screenshots/main-ui.png) | ![Graph](docs/screenshots/graph-view.png) |
+
+| Quick Capture (Ctrl+Alt+N) | Command Palette (Ctrl+P) |
+|---|---|
+| ![Quick Capture](docs/screenshots/quick-capture.png) | ![Palette](docs/screenshots/command-palette.png) |
+
 ## 📥 Build from source
 
 Pre-built binaries are on the [releases page](https://github.com/vswk001/Taxa/releases). To build from source:
